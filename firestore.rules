@@ -1,0 +1,117 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // =========================================================================
+    // 1. System Configuration & Global Lock Switch (`systemConfig/munState`)
+    // =========================================================================
+    match /systemConfig/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // =========================================================================
+    // 2. Safe User Profiles (`users/{userId}`)
+    // =========================================================================
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) && request.resource.data.uid == resource.data.uid;
+    }
+
+    // =========================================================================
+    // 3. Claimed Seats (1-Person-Per-Seat Exclusivity)
+    // =========================================================================
+    match /claimed_seats/{seatKey} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // 4. Real-Time Committee Debate Timers (`committee_timers/{committeeId}`)
+    // =========================================================================
+    match /committee_timers/{committeeId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // =========================================================================
+    // 5. General Speakers List (GSL) (`committee_speakers/{speakerId}`)
+    // =========================================================================
+    match /committee_speakers/{speakerId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // =========================================================================
+    // 6. Committee Motions & Caucuses (`committee_motions/{motionId}`)
+    // =========================================================================
+    match /committee_motions/{motionId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // =========================================================================
+    // 7. Voting Sessions & P5 Resolutions Engine (`voting_sessions/{sessionId}`)
+    // =========================================================================
+    match /voting_sessions/{sessionId} {
+      allow read, create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // Generic Committee / Motion / Vote fallbacks
+    match /committees/{committeeId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /motions/{motionId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /votes/{voteId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // =========================================================================
+    // 8. Conference Photo Gallery & Selfie Pairing Invites
+    // =========================================================================
+    match /gallery_items/{docId} {
+      allow read, create: if true;
+      allow update, delete: if false;
+    }
+
+    match /gallery_invites/{inviteId} {
+      allow read, create, delete: if true;
+      allow update: if false;
+    }
+
+    match /gallery/{imageId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // =========================================================================
+    // 9. Contact Support & Feedback Submissions
+    // =========================================================================
+    match /feedback/{doc} {
+      allow create: if isAuthenticated()
+                    && request.resource.data.message is string
+                    && request.resource.data.message.size() > 0
+                    && request.resource.data.message.size() < 4001;
+      allow read, update, delete: if false;
+    }
+
+    // =========================================================================
+    // 10. Default Deny for all other collections
+    // =========================================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
