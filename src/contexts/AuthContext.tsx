@@ -5,6 +5,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   updateProfile,
@@ -43,6 +45,9 @@ const AuthContext = createContext<AuthContextValue>({
 export const useAuth = () => useContext(AuthContext);
 
 const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account',
+});
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -50,10 +55,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Process redirect result if returning from signInWithRedirect
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          setUser(result.user);
+        }
+      })
+      .catch((err) => {
+        if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+          setError(mapFirebaseError(err.code));
+        }
+      });
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
     });
+
     return unsubscribe;
   }, []);
 
@@ -81,9 +100,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async () => {
     try {
       setError(null);
+      // Attempt popup first
       await signInWithPopup(auth, googleProvider);
     } catch (err: any) {
-      if (err.code === 'auth/popup-closed-by-user') return;
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        return;
+      }
+
+      // If popup is blocked by browser or Cross-Origin policy, fallback to redirect
+      if (
+        err.code === 'auth/popup-blocked' ||
+        err.message?.includes('Cross-Origin-Opener-Policy') ||
+        err.message?.includes('window.close')
+      ) {
+        try {
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        } catch (redirectErr: any) {
+          setError(mapFirebaseError(redirectErr.code));
+          return;
+        }
+      }
+
       setError(mapFirebaseError(err.code));
     }
   };
@@ -123,6 +161,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 function mapFirebaseError(code: string): string {
   switch (code) {
+    case 'auth/unauthorized-domain':
+      return 'This domain is not authorized in Firebase. Add this domain to Firebase Console > Authentication > Settings > Authorized Domains.';
+    case 'auth/popup-blocked':
+      return 'Sign-in popup was blocked by your browser. Please allow popups or try again.';
     case 'auth/user-not-found':
     case 'auth/wrong-password':
     case 'auth/invalid-credential':
@@ -136,6 +178,6 @@ function mapFirebaseError(code: string): string {
     case 'auth/too-many-requests':
       return 'Too many attempts. Please try again later.';
     default:
-      return 'An error occurred. Please try again.';
+      return 'An error occurred during authentication. Please try again.';
   }
 }
