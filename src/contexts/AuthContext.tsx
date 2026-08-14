@@ -4,7 +4,6 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   GoogleAuthProvider,
@@ -15,7 +14,7 @@ import {
 import { auth } from '../firebase';
 
 // ---------------------------------------------------------------------------
-// AuthContext – email/password + Google authentication + Password Reset
+// AuthContext – email/password + Google Sign-In with Redirect + Password Reset
 // ---------------------------------------------------------------------------
 
 interface AuthContextValue {
@@ -55,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Process redirect result if returning from signInWithRedirect
+    // Check for redirect result on app initialization
     getRedirectResult(auth)
       .then((result) => {
         if (result?.user) {
@@ -97,31 +96,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Direct Sign In with Redirect (eliminates popup blocker and COOP errors)
   const signInWithGoogle = async () => {
     try {
       setError(null);
-      // Attempt popup first
-      await signInWithPopup(auth, googleProvider);
+      await signInWithRedirect(auth, googleProvider);
     } catch (err: any) {
-      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
-        return;
-      }
-
-      // If popup is blocked by browser or Cross-Origin policy, fallback to redirect
-      if (
-        err.code === 'auth/popup-blocked' ||
-        err.message?.includes('Cross-Origin-Opener-Policy') ||
-        err.message?.includes('window.close')
-      ) {
-        try {
-          await signInWithRedirect(auth, googleProvider);
-          return;
-        } catch (redirectErr: any) {
-          setError(mapFirebaseError(redirectErr.code));
-          return;
-        }
-      }
-
       setError(mapFirebaseError(err.code));
     }
   };
@@ -163,8 +143,6 @@ function mapFirebaseError(code: string): string {
   switch (code) {
     case 'auth/unauthorized-domain':
       return 'This domain is not authorized in Firebase. Add this domain to Firebase Console > Authentication > Settings > Authorized Domains.';
-    case 'auth/popup-blocked':
-      return 'Sign-in popup was blocked by your browser. Please allow popups or try again.';
     case 'auth/user-not-found':
     case 'auth/wrong-password':
     case 'auth/invalid-credential':
