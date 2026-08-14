@@ -21,6 +21,13 @@ import {
   Loader2,
   FileText,
   Lock,
+  ArrowUp,
+  ArrowDown,
+  Trash2,
+  Check,
+  X,
+  Share2,
+  HelpCircle,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -30,6 +37,7 @@ import type {
   CommitteeTimerState,
   SpeakerQueueItem,
   CommitteeMotion,
+  RaisedHandItem,
   MUNState,
 } from '../types';
 import { isOrganiserRole } from '../types';
@@ -43,9 +51,17 @@ import {
   setSpeakerStatus,
   clearSpeakerQueue,
   subscribeToSpeakerQueue,
+  moveSpeakerInQueue,
+  yieldSpeakerFloor,
   submitMotion,
   updateMotionStatus,
+  deleteMotion,
   subscribeToMotions,
+  subscribeToRaisedHands,
+  raiseHand,
+  lowerHand,
+  lowerMyHand,
+  clearAllRaisedHands,
 } from '../services/committeeService';
 import {
   createVotingSession,
@@ -140,21 +156,18 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
     isOrganiser ? 'admin' : 'debate'
   );
 
-  // ── Voting Sessions State ────────────────────────────────────────────────
+  // ── Real-Time State ──────────────────────────────────────────────────────
   const [sessions, setSessions] = useState<VotingSession[]>([]);
   const [votingLoading, setVotingLoading] = useState(true);
-
-  // ── Debate Timer State (Synchronized) ─────────────────────────────────────
   const [timerDoc, setTimerDoc] = useState<CommitteeTimerState | null>(null);
   const [localSeconds, setLocalSeconds] = useState(60);
   const timerExpiredPlayedRef = useRef(false);
-
-  // ── General Speakers List State ──────────────────────────────────────────
   const [speakers, setSpeakers] = useState<SpeakerQueueItem[]>([]);
   const [speakerLoading, setSpeakerLoading] = useState(true);
-
-  // ── Motions State ────────────────────────────────────────────────────────
   const [motions, setMotions] = useState<CommitteeMotion[]>([]);
+  const [raisedHands, setRaisedHands] = useState<RaisedHandItem[]>([]);
+  const [togglingHand, setTogglingHand] = useState(false);
+  const [showHandsList, setShowHandsList] = useState(false);
 
   // ── Listeners per Active Committee ───────────────────────────────────────
   useEffect(() => {
@@ -164,7 +177,7 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
     const unsubVoting = subscribeToSessions((all) => {
       setSessions(all);
       setVotingLoading(false);
-    });
+    }, activeCommittee);
 
     const unsubTimer = subscribeToTimer(activeCommittee, (t) => {
       setTimerDoc(t);
@@ -173,7 +186,7 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
       }
     });
 
-    const unsubSpeakers = subscribeToSpeakerQueue(activeCommittee, (list: SpeakerQueueItem[]) => {
+    const unsubSpeakers = subscribeToSpeakerQueue(activeCommittee, (list) => {
       setSpeakers(list);
       setSpeakerLoading(false);
     });
@@ -182,11 +195,16 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
       setMotions(mList);
     });
 
+    const unsubHands = subscribeToRaisedHands(activeCommittee, (hands) => {
+      setRaisedHands(hands);
+    });
+
     return () => {
       unsubVoting();
       unsubTimer();
       unsubSpeakers();
       unsubMotions();
+      unsubHands();
     };
   }, [activeCommittee]);
 
@@ -203,7 +221,6 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
       return;
     }
 
-    // Ticking interval calculation based on server timestamp
     const interval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - timerDoc.updatedAt) / 1000);
       const remaining = Math.max(0, timerDoc.remainingSeconds - elapsed);
@@ -218,22 +235,43 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
     return () => clearInterval(interval);
   }, [timerDoc]);
 
-  // ── Dark theme strictly uses grey, black and white ────────────────────────
+  // ── Hand Raise Toggle Handler ─────────────────────────────────────────────
+  const isMyHandRaised = raisedHands.some((h) => h.uid === profile.uid);
+
+  const handleToggleHand = async () => {
+    if (togglingHand) return;
+    setTogglingHand(true);
+    try {
+      if (isMyHandRaised) {
+        await lowerMyHand(activeCommittee, profile.uid);
+      } else {
+        await raiseHand(activeCommittee, {
+          uid: profile.uid,
+          name: profile.name || profile.displayName,
+          country: profile.country,
+        });
+      }
+    } catch (err) {
+      console.error('Error toggling hand raise:', err);
+    } finally {
+      setTogglingHand(false);
+    }
+  };
+
+  // ── Dark theme palette ────────────────────────────────────────────────────
   const dividerBorder = dark ? '#27272a' : '#e2e8f0';
   const headingColor = dark ? '#ffffff' : '#172554';
   const mutedText = dark ? '#a1a1aa' : '#475569';
 
   const activeSpeaker = speakers.find((s) => s.status === 'speaking');
-  const userInQueue = speakers.find((s) => s.uid === profile.uid);
+  const userInQueue = speakers.find((s) => s.uid === profile.uid && s.status === 'waiting');
+  const activeOpenVote = sessions.find((s) => s.status === 'open');
 
   // ── Gated Lock Screen for Non-Admins if Inactive ─────────────────────────
   if (!munState.isActive && !isOrganiser) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-16">
-        <div
-          className="border-t pt-12 text-center"
-          style={{ borderColor: '#ef4444' }}
-        >
+        <div className="border-t pt-12 text-center" style={{ borderColor: '#ef4444' }}>
           <div className="inline-flex p-4 rounded-2xl mb-6 border bg-red-500/10 border-red-500/30 text-red-500">
             <Lock className="h-12 w-12" />
           </div>
@@ -250,7 +288,9 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
             className="mt-8 pt-6 border-t flex flex-col sm:flex-row items-center justify-center gap-4 text-xs font-semibold"
             style={{ borderColor: dividerBorder, color: mutedText }}
           >
-            <span>The Gallery section remains open and accessible in the top navigation bar.</span>
+            <span>Conference: <strong>FLY Model United Nations</strong></span>
+            <span>·</span>
+            <span>Signed in as: <strong>{profile.name || profile.displayName} ({profile.role})</strong></span>
           </div>
         </div>
       </div>
@@ -258,45 +298,174 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-10">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       
-      {/* ── Top Header Banner (Cardless, Divided by Line) ────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b" style={{ borderColor: dividerBorder }}>
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <h1 className="font-serif text-3xl sm:text-4xl font-normal tracking-tight" style={{ color: headingColor }}>
-              Interactive MUN Workspace
-            </h1>
-          </div>
+      {/* ── Active Real-Time Voting Popup / Banner (Task 7) ───────────────── */}
+      {activeOpenVote && isDelegate && (
+        <ActiveVoteDelegateBanner
+          session={activeOpenVote}
+          profile={profile}
+          dark={dark}
+          dividerBorder={dividerBorder}
+        />
+      )}
 
-          <p className="text-xs sm:text-sm font-normal" style={{ color: mutedText }}>
-            Authenticated as: <strong className="font-semibold" style={{ color: headingColor }}>{profile.name || profile.displayName}</strong>{' '}
-            (<span className="font-mono text-xs" style={{ color: dark ? '#ffffff' : '#172554' }}>{profile.role}</span>) ·{' '}
-            Representation:{' '}
-            <strong className="font-semibold" style={{ color: dark ? '#ffffff' : '#172554' }}>
-              {profile.country.startsWith('N/A') ? 'Executive Board' : profile.country}
-            </strong>
-          </p>
+      {/* ── Committee Top Control Header ──────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b" style={{ borderColor: dividerBorder }}>
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span
+              className="text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full"
+              style={{
+                background: dark ? '#18181b' : '#fef08a',
+                color: dark ? '#ffffff' : '#172554',
+                border: `1px solid ${dividerBorder}`,
+              }}
+            >
+              {profile.role} · {profile.country || 'Executive Secretariat'}
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-500">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> Live Room
+            </span>
+          </div>
+          <h1 className="font-serif text-3xl sm:text-4xl font-normal tracking-tight" style={{ color: headingColor }}>
+            {activeCommittee} Workspace
+          </h1>
         </div>
 
-        {/* Committee Selector */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 min-w-[280px]">
-          <span className="text-xs font-mono font-medium whitespace-nowrap uppercase tracking-wider" style={{ color: mutedText }}>
-            Chamber:
-          </span>
-          <div className="relative w-full sm:w-auto flex-1">
+        {/* Action Controls: Hand Raise + Committee Dropdown */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Delegate Hand Raise Button (Task 3) */}
+          {isDelegate && (
+            <button
+              onClick={handleToggleHand}
+              disabled={togglingHand}
+              className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition shadow-sm ${
+                isMyHandRaised ? 'animate-bounce' : ''
+              }`}
+              style={{
+                background: isMyHandRaised
+                  ? (dark ? '#3f3f46' : '#fde047')
+                  : (dark ? '#18181b' : '#ffffff'),
+                color: isMyHandRaised
+                  ? (dark ? '#ffffff' : '#172554')
+                  : (dark ? '#ffffff' : '#172554'),
+                border: `1px solid ${isMyHandRaised ? (dark ? '#71717a' : '#eab308') : dividerBorder}`,
+              }}
+            >
+              <Hand className={`h-4 w-4 ${isMyHandRaised ? 'fill-current' : ''}`} />
+              <span>{isMyHandRaised ? 'Hand Raised (Click to Lower)' : 'Raise Hand'}</span>
+            </button>
+          )}
+
+          {/* Chair / Organiser Raised Hands Counter & Drawer Toggle */}
+          {isChair && (
+            <div className="relative">
+              <button
+                onClick={() => setShowHandsList(!showHandsList)}
+                className="px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 border transition"
+                style={{
+                  background: raisedHands.length > 0 ? (dark ? '#27272a' : '#fef08a') : (dark ? '#18181b' : '#faf8f5'),
+                  borderColor: raisedHands.length > 0 ? (dark ? '#3f3f46' : '#fde047') : dividerBorder,
+                  color: dark ? '#ffffff' : '#172554',
+                }}
+              >
+                <Hand className="h-3.5 w-3.5" />
+                <span>{raisedHands.length} Hand{raisedHands.length !== 1 ? 's' : ''} Raised</span>
+                <ChevronDown className="h-3 w-3" />
+              </button>
+
+              {showHandsList && (
+                <div
+                  className="absolute right-0 mt-2 w-72 rounded-xl shadow-xl border p-3 z-50 space-y-2"
+                  style={{
+                    background: dark ? '#18181b' : '#ffffff',
+                    borderColor: dividerBorder,
+                  }}
+                >
+                  <div className="flex items-center justify-between pb-2 border-b" style={{ borderColor: dividerBorder }}>
+                    <span className="text-xs font-black uppercase" style={{ color: headingColor }}>
+                      Raised Hands Queue
+                    </span>
+                    {raisedHands.length > 0 && (
+                      <button
+                        onClick={() => clearAllRaisedHands(activeCommittee)}
+                        className="text-[10px] text-red-400 font-bold hover:underline"
+                      >
+                        Lower All
+                      </button>
+                    )}
+                  </div>
+
+                  {raisedHands.length === 0 ? (
+                    <p className="text-xs py-3 text-center italic" style={{ color: mutedText }}>
+                      No hands currently raised.
+                    </p>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto space-y-1.5">
+                      {raisedHands.map((h, idx) => (
+                        <div
+                          key={h.id}
+                          className="flex items-center justify-between p-2 rounded-lg text-xs border"
+                          style={{
+                            background: dark ? '#27272a' : '#faf8f5',
+                            borderColor: dividerBorder,
+                          }}
+                        >
+                          <div>
+                            <span className="font-bold block" style={{ color: headingColor }}>
+                              #{idx + 1} {h.name}
+                            </span>
+                            <span className="text-[10px] font-medium" style={{ color: mutedText }}>
+                              {h.country}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={async () => {
+                                await addSpeakerToQueue(activeCommittee, {
+                                  uid: h.uid,
+                                  name: h.name,
+                                  country: h.country,
+                                });
+                                await lowerHand(h.id);
+                              }}
+                              title="Add to GSL"
+                              className="px-2 py-1 rounded text-[10px] font-bold bg-yellow-400/20 text-yellow-600 dark:text-yellow-300 border border-yellow-400/40 hover:bg-yellow-400/30"
+                            >
+                              + GSL
+                            </button>
+                            <button
+                              onClick={() => lowerHand(h.id)}
+                              title="Lower Hand"
+                              className="p-1 rounded text-red-400 hover:bg-red-950"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Committee Switcher */}
+          <div className="relative">
             <select
               value={activeCommittee}
               onChange={(e) => setActiveCommittee(e.target.value as CommitteeName)}
-              className="w-full sm:min-w-[260px] max-w-full appearance-none pl-3.5 pr-10 py-2.5 rounded-xl text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-yellow-300 transition cursor-pointer"
+              className="appearance-none font-bold text-xs sm:text-sm pl-4 pr-10 py-2 rounded-lg transition-colors cursor-pointer"
               style={{
                 background: dark ? '#18181b' : '#faf8f5',
                 border: `1px solid ${dividerBorder}`,
-                color: headingColor,
+                color: dark ? '#ffffff' : '#172554',
               }}
             >
               {COMMITTEES.map((c) => (
-                <option key={c} value={c}>
+                <option key={c} value={c} style={{ background: dark ? '#18181b' : '#ffffff', color: dark ? '#ffffff' : '#172554' }}>
                   {c}
                 </option>
               ))}
@@ -306,12 +475,12 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
         </div>
       </div>
 
-      {/* ── Workspace Sub-Tabs (Clean text tabs) ──────────────────────────── */}
+      {/* ── Workspace Sub-Tabs ────────────────────────────────────────────── */}
       <div className="flex items-center gap-4 border-b pb-4 overflow-x-auto" style={{ borderColor: dividerBorder }}>
         {[
           ...(isOrganiser ? [{ id: 'admin', label: 'Admin Control Center' }] : []),
           { id: 'debate', label: 'Live Debate & Timers' },
-          { id: 'voting', label: 'Voting & Resolutions' },
+          { id: 'voting', label: `Voting & Resolutions (${sessions.length})` },
           { id: 'roster', label: 'Committee Roster' },
         ].map(({ id, label }) => {
           const isActive = workspaceTab === id;
@@ -319,11 +488,12 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
             <button
               key={id}
               onClick={() => setWorkspaceTab(id as any)}
-              className={`text-xs sm:text-sm transition whitespace-nowrap ${
-                isActive ? 'font-bold' : 'font-medium opacity-70 hover:opacity-100'
+              className={`text-xs sm:text-sm transition whitespace-nowrap pb-1 ${
+                isActive ? 'font-bold border-b-2' : 'font-medium opacity-70 hover:opacity-100'
               }`}
               style={{
                 color: isActive ? (dark ? '#ffffff' : '#172554') : mutedText,
+                borderColor: isActive ? (dark ? '#ffffff' : '#172554') : 'transparent',
               }}
             >
               <span>{label}</span>
@@ -332,7 +502,7 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
         })}
       </div>
 
-      {/* ── TAB 0: ADMIN CONTROL CENTER (Event Organiser Only) ─────────────── */}
+      {/* ── TAB 0: ADMIN CONTROL CENTER ────────────────────────────────────── */}
       {workspaceTab === 'admin' && isOrganiser && (
         <AdminWorkspacePanel profile={profile} />
       )}
@@ -347,34 +517,43 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
               committeeId={activeCommittee}
               timerDoc={timerDoc}
               localSeconds={localSeconds}
-              isChair={isChair || isOrganiser}
+              isChair={isChair}
               dark={dark}
               dividerBorder={dividerBorder}
               headingColor={headingColor}
               mutedText={mutedText}
             />
 
-            {/* Motions Section */}
+            {/* Motions Section (Task 2) */}
             <MotionsSection
               committeeId={activeCommittee}
               motions={motions}
               profile={profile}
-              isChair={isChair || isOrganiser}
+              isChair={isChair}
               dark={dark}
               dividerBorder={dividerBorder}
               headingColor={headingColor}
               mutedText={mutedText}
+              onStartTimerForMotion={async (m) => {
+                await startTimer(
+                  activeCommittee,
+                  m.speakingTime > 0 ? m.speakingTime : m.totalTime,
+                  m.totalTime,
+                  m.type === 'Unmoderated Caucus' ? 'Unmoderated Caucus' : 'Moderated Caucus',
+                  m.topic
+                );
+              }}
             />
           </div>
 
-          {/* RIGHT 6 COLS: General Speakers List (GSL) */}
+          {/* RIGHT 6 COLS: Persistent MyMUN-Styled General Speakers List (Task 4) */}
           <div className="lg:col-span-6 space-y-10">
             <GeneralSpeakersListSection
               committeeId={activeCommittee}
               speakers={speakers}
               speakerLoading={speakerLoading}
               profile={profile}
-              isChair={isChair || isOrganiser}
+              isChair={isChair}
               isDelegate={isDelegate}
               userInQueue={userInQueue}
               activeSpeaker={activeSpeaker}
@@ -382,18 +561,22 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
               dividerBorder={dividerBorder}
               headingColor={headingColor}
               mutedText={mutedText}
+              onResetTimerForSpeaker={async () => {
+                await resetTimer(activeCommittee, 60, 'Speaker');
+              }}
             />
           </div>
 
         </div>
       )}
 
-      {/* ── TAB 2: VOTING & RESOLUTIONS (Cardless) ─────────────────────────── */}
+      {/* ── TAB 2: VOTING & RESOLUTIONS (Task 1 & Task 7) ─────────────────── */}
       {workspaceTab === 'voting' && (
         <div className="space-y-10">
           {/* Chair / Organiser creation panel */}
-          {(isChair || isOrganiser) && (
+          {isChair && (
             <CreateSessionSection
+              committeeId={activeCommittee}
               dark={dark}
               dividerBorder={dividerBorder}
               uid={user?.uid || ''}
@@ -413,7 +596,7 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
               </div>
             ) : sessions.length === 0 ? (
               <div className="text-center py-16 border-t font-medium" style={{ borderColor: dividerBorder }}>
-                <p style={{ color: mutedText }}>No voting sessions active for this committee. A Chair or Organiser can initialize one.</p>
+                <p style={{ color: mutedText }}>No voting sessions active for {activeCommittee}. A Chair or Organiser can initialize one above.</p>
               </div>
             ) : (
               <div className="space-y-8">
@@ -432,10 +615,12 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
         </div>
       )}
 
-      {/* ── TAB 3: COMMITTEE ROSTER (Cardless) ─────────────────────────────── */}
+      {/* ── TAB 3: COMMITTEE ROSTER (Task 3) ───────────────────────────────── */}
       {workspaceTab === 'roster' && (
         <CommitteeRosterSection
           activeCommittee={activeCommittee}
+          raisedHands={raisedHands}
+          speakers={speakers}
           dark={dark}
           dividerBorder={dividerBorder}
           headingColor={headingColor}
@@ -448,7 +633,120 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
 };
 
 // ---------------------------------------------------------------------------
-// 1. Cardless Debate Timer Section (Divided by Horizontal Lines)
+// Active Vote Delegate Banner (Task 7 Live Popup)
+// ---------------------------------------------------------------------------
+
+const ActiveVoteDelegateBanner: React.FC<{
+  session: VotingSession;
+  profile: UserProfile;
+  dark: boolean;
+  dividerBorder: string;
+}> = ({ session, profile, dark, dividerBorder }) => {
+  const [submittingVote, setSubmittingVote] = useState(false);
+  const myVote = session.votes?.[profile.uid];
+
+  const handleVote = async (choice: 'YES' | 'NO' | 'ABSTAIN') => {
+    setSubmittingVote(true);
+    try {
+      await castVote(session.id, {
+        country: profile.country,
+        displayName: profile.name || profile.displayName,
+        uid: profile.uid,
+        vote: choice,
+        isP5: profile.isP5,
+      });
+    } catch (err) {
+      console.error('Failed to cast vote:', err);
+    } finally {
+      setSubmittingVote(false);
+    }
+  };
+
+  return (
+    <div
+      className="p-4 sm:p-5 rounded-2xl border transition shadow-lg"
+      style={{
+        background: dark ? '#18181b' : '#fef08a22',
+        borderColor: dark ? '#3f3f46' : '#fde047',
+      }}
+    >
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-red-500 animate-ping" />
+            <span className="text-[10px] font-black uppercase tracking-wider text-red-500">
+              Live Committee Voting in Progress
+            </span>
+            <span
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase"
+              style={{
+                background: dark ? '#27272a' : '#fef08a',
+                color: dark ? '#ffffff' : '#172554',
+              }}
+            >
+              {session.isSubstantive ? 'Substantive (2/3 Majority)' : 'Procedural (Simple Majority)'}
+            </span>
+          </div>
+          <h3 className="font-serif text-xl sm:text-2xl font-bold" style={{ color: dark ? '#ffffff' : '#172554' }}>
+            "{session.title}"
+          </h3>
+          {session.description && (
+            <p className="text-xs font-medium mt-0.5" style={{ color: dark ? '#a1a1aa' : '#475569' }}>
+              {session.description}
+            </p>
+          )}
+        </div>
+
+        {myVote ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold" style={{ color: dark ? '#ffffff' : '#172554' }}>
+              Your Vote:
+            </span>
+            <span
+              className="px-3 py-1.5 rounded-lg text-xs font-black uppercase border"
+              style={{
+                background: myVote.vote === 'YES' ? '#065f46' : myVote.vote === 'NO' ? '#7f1d1d' : '#3f3f46',
+                color: '#ffffff',
+                borderColor: myVote.vote === 'YES' ? '#059669' : myVote.vote === 'NO' ? '#dc2626' : '#71717a',
+              }}
+            >
+              ✓ {myVote.vote}
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleVote('YES')}
+              disabled={submittingVote}
+              className="px-4 py-2 rounded-lg text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-700 transition shadow-sm"
+            >
+              In Favor (Yes)
+            </button>
+            <button
+              onClick={() => handleVote('NO')}
+              disabled={submittingVote}
+              className="px-4 py-2 rounded-lg text-xs font-black uppercase text-white bg-red-600 hover:bg-red-700 transition shadow-sm"
+            >
+              Against (No)
+            </button>
+            {session.isSubstantive && (
+              <button
+                onClick={() => handleVote('ABSTAIN')}
+                disabled={submittingVote}
+                className="px-3 py-2 rounded-lg text-xs font-black uppercase text-zinc-300 bg-zinc-700 hover:bg-zinc-600 transition shadow-sm"
+              >
+                Abstain
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// 1. Cardless Debate Timer Section
 // ---------------------------------------------------------------------------
 
 interface DebateTimerSectionProps {
@@ -547,7 +845,6 @@ const DebateTimerSection: React.FC<DebateTimerSectionProps> = ({
         </button>
       </div>
 
-      {/* Horizontal Divider */}
       <div className="border-t" style={{ borderColor: dividerBorder }} />
 
       {/* 2. Timer Mode & Topic Info */}
@@ -562,7 +859,6 @@ const DebateTimerSection: React.FC<DebateTimerSectionProps> = ({
         )}
       </div>
 
-      {/* Horizontal Divider */}
       <div className="border-t" style={{ borderColor: dividerBorder }} />
 
       {/* 3. Big Digital Clock Display */}
@@ -588,22 +884,20 @@ const DebateTimerSection: React.FC<DebateTimerSectionProps> = ({
         </div>
       </div>
 
-      {/* Horizontal Divider */}
       <div className="border-t" style={{ borderColor: dividerBorder }} />
 
       {/* 4. Chair / Admin Controls */}
       {isChair ? (
         <div className="space-y-6">
-          {/* Main Action Buttons */}
           <div className="flex items-center gap-3">
             {isRunning ? (
               <button
                 onClick={handlePause}
-                className="flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition"
+                className="flex-1 py-3 rounded-lg font-black text-sm flex items-center justify-center gap-2 border transition shadow-sm"
                 style={{
-                  background: dark ? '#18181b' : '#faf8f5',
+                  background: dark ? '#27272a' : '#fef08a',
                   color: dark ? '#ffffff' : '#172554',
-                  border: `1px solid ${dividerBorder}`,
+                  borderColor: dark ? '#3f3f46' : '#fde047',
                 }}
               >
                 <Pause className="h-4 w-4" /> Pause
@@ -611,42 +905,33 @@ const DebateTimerSection: React.FC<DebateTimerSectionProps> = ({
             ) : (
               <button
                 onClick={handleStart}
-                className="flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition shadow-sm"
-                style={{
-                  background: dark ? '#27272a' : '#fef08a',
-                  color: dark ? '#ffffff' : '#172554',
-                  border: dark ? '1px solid #3f3f46' : '1px solid #fde047',
-                }}
+                className="flex-1 py-3 rounded-lg font-black text-sm flex items-center justify-center gap-2 transition shadow-sm text-white bg-emerald-600 hover:bg-emerald-700"
               >
-                <Play className="h-4 w-4" /> Start / Resume
+                <Play className="h-4 w-4 fill-current" /> Start Timer
               </button>
             )}
 
             <button
               onClick={() => handleReset()}
-              className="px-4 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 transition"
+              className="p-3 rounded-lg border font-bold transition"
               style={{
                 background: dark ? '#18181b' : '#faf8f5',
-                color: dark ? '#d4d4d8' : '#172554',
-                border: `1px solid ${dividerBorder}`,
+                borderColor: dividerBorder,
+                color: dark ? '#ffffff' : '#172554',
               }}
             >
-              <RotateCcw className="h-4 w-4" /> Reset
+              <RotateCcw className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Horizontal Divider */}
-          <div className="border-t" style={{ borderColor: dividerBorder }} />
-
-          {/* Quick Presets */}
+          {/* Preset Buttons */}
           <div className="flex flex-wrap gap-2">
-            <span className="text-xs font-bold self-center mr-1" style={{ color: mutedText }}>
-              Presets:
-            </span>
             {[
-              { label: '60s (Speaker)', m: 1, s: 0, mode: 'Speaker' as const },
-              { label: '90s', m: 1, s: 30, mode: 'Speaker' as const },
-              { label: '5m (Mod Caucus)', m: 5, s: 0, mode: 'Moderated Caucus' as const },
+              { label: '45s (GSL)', m: 0, s: 45, mode: 'Speaker' as const },
+              { label: '60s (GSL)', m: 1, s: 0, mode: 'Speaker' as const },
+              { label: '90s (GSL)', m: 1, s: 30, mode: 'Speaker' as const },
+              { label: '5m (Mod)', m: 5, s: 0, mode: 'Moderated Caucus' as const },
+              { label: '10m (Mod)', m: 10, s: 0, mode: 'Moderated Caucus' as const },
               { label: '10m (Unmod)', m: 10, s: 0, mode: 'Unmoderated Caucus' as const },
             ].map(({ label, m, s, mode: tMode }) => (
               <button
@@ -664,7 +949,6 @@ const DebateTimerSection: React.FC<DebateTimerSectionProps> = ({
             ))}
           </div>
 
-          {/* Horizontal Divider */}
           <div className="border-t" style={{ borderColor: dividerBorder }} />
 
           {/* Custom Duration & Topic Settings */}
@@ -727,7 +1011,7 @@ const DebateTimerSection: React.FC<DebateTimerSectionProps> = ({
 };
 
 // ---------------------------------------------------------------------------
-// 2. Cardless General Speakers List Section (Divided by Horizontal Lines)
+// 2. Persistent MyMUN-Style General Speakers List (GSL) Section (Task 4)
 // ---------------------------------------------------------------------------
 
 interface GeneralSpeakersListSectionProps {
@@ -743,6 +1027,7 @@ interface GeneralSpeakersListSectionProps {
   dividerBorder: string;
   headingColor: string;
   mutedText: string;
+  onResetTimerForSpeaker: () => Promise<void>;
 }
 
 const GeneralSpeakersListSection: React.FC<GeneralSpeakersListSectionProps> = ({
@@ -758,10 +1043,17 @@ const GeneralSpeakersListSection: React.FC<GeneralSpeakersListSectionProps> = ({
   dividerBorder,
   headingColor,
   mutedText,
+  onResetTimerForSpeaker,
 }) => {
   const [submittingHand, setSubmittingHand] = useState(false);
+  const [manualCountry, setManualCountry] = useState('');
+  const [yieldModalOpen, setYieldModalOpen] = useState(false);
+  const [selectedYieldTarget, setSelectedYieldTarget] = useState('');
 
-  const handleRaiseHand = async () => {
+  // Available countries in this committee
+  const committeeDelegates = ROSTER_MASTER_DATA.filter((r) => r.committee === committeeId);
+
+  const handleAddMeToGSL = async () => {
     setSubmittingHand(true);
     try {
       await addSpeakerToQueue(committeeId, {
@@ -775,7 +1067,7 @@ const GeneralSpeakersListSection: React.FC<GeneralSpeakersListSectionProps> = ({
     setSubmittingHand(false);
   };
 
-  const handleLowerHand = async () => {
+  const handleWithdrawFromGSL = async () => {
     if (!userInQueue) return;
     setSubmittingHand(true);
     try {
@@ -786,6 +1078,17 @@ const GeneralSpeakersListSection: React.FC<GeneralSpeakersListSectionProps> = ({
     setSubmittingHand(false);
   };
 
+  const handleAddCountryToQueue = async () => {
+    if (!manualCountry) return;
+    const match = committeeDelegates.find((d) => d.country === manualCountry);
+    await addSpeakerToQueue(committeeId, {
+      uid: match ? `delegate_${match.id}` : `manual_${Date.now()}`,
+      name: match ? match.name : manualCountry,
+      country: manualCountry,
+    });
+    setManualCountry('');
+  };
+
   const handleNextSpeaker = async () => {
     if (activeSpeaker) {
       await setSpeakerStatus(activeSpeaker.id, 'completed');
@@ -793,20 +1096,17 @@ const GeneralSpeakersListSection: React.FC<GeneralSpeakersListSectionProps> = ({
     const next = speakers.find((s) => s.status === 'waiting');
     if (next) {
       await setSpeakerStatus(next.id, 'speaking');
+      await onResetTimerForSpeaker();
     }
   };
 
-  const handleRemoveSpeaker = async (id: string) => {
-    await removeSpeakerFromQueue(id);
+  const handleYield = async (type: 'Chair' | 'Delegate' | 'Questions') => {
+    if (!activeSpeaker) return;
+    await yieldSpeakerFloor(activeSpeaker.id, type, selectedYieldTarget);
+    setYieldModalOpen(false);
   };
 
-  const handleClear = async () => {
-    if (confirm('Clear the entire speakers queue for this committee?')) {
-      await clearSpeakerQueue(committeeId);
-    }
-  };
-
-  const queueList = speakers.filter((s) => s.status !== 'completed');
+  const waitingQueue = speakers.filter((s) => s.status === 'waiting');
 
   return (
     <div className="space-y-6">
@@ -820,7 +1120,7 @@ const GeneralSpeakersListSection: React.FC<GeneralSpeakersListSectionProps> = ({
             className="text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider"
             style={{ background: dark ? '#18181b' : '#fef08a', color: dark ? '#ffffff' : '#172554' }}
           >
-            {queueList.length} in queue
+            {waitingQueue.length} in queue
           </span>
         </div>
 
@@ -838,7 +1138,11 @@ const GeneralSpeakersListSection: React.FC<GeneralSpeakersListSectionProps> = ({
               Next Speaker →
             </button>
             <button
-              onClick={handleClear}
+              onClick={() => {
+                if (confirm('Clear the entire speakers queue for this committee?')) {
+                  clearSpeakerQueue(committeeId);
+                }
+              }}
               className="text-xs px-2.5 py-1.5 rounded-lg border font-bold text-red-400 border-red-900/60 hover:bg-red-950 transition"
             >
               Clear
@@ -847,27 +1151,69 @@ const GeneralSpeakersListSection: React.FC<GeneralSpeakersListSectionProps> = ({
         )}
       </div>
 
-      {/* Horizontal Divider */}
       <div className="border-t" style={{ borderColor: dividerBorder }} />
 
-      {/* 2. Active Speaker Spotlight */}
-      <div>
+      {/* 2. Active Speaker Spotlight with Yields */}
+      <div className="p-4 rounded-xl border" style={{ background: dark ? '#18181b' : '#faf8f5', borderColor: dividerBorder }}>
         <span className="text-[10px] font-extrabold uppercase tracking-wider block mb-1" style={{ color: mutedText }}>
           Current Floor Holder
         </span>
         {activeSpeaker ? (
-          <div className="flex items-center justify-between py-2">
-            <div>
-              <h4 className="font-black text-lg sm:text-xl" style={{ color: headingColor }}>
-                {activeSpeaker.name}
-              </h4>
-              <p className="text-xs font-bold" style={{ color: dark ? '#ffffff' : '#1e3a8a' }}>
-                {activeSpeaker.country}
-              </p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-black text-lg sm:text-xl" style={{ color: headingColor }}>
+                  {activeSpeaker.name}
+                </h4>
+                <p className="text-xs font-bold" style={{ color: dark ? '#ffffff' : '#1e3a8a' }}>
+                  {activeSpeaker.country}
+                </p>
+              </div>
+              <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-400 border border-emerald-800 animate-pulse">
+                LIVE ON FLOOR
+              </span>
             </div>
-            <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-400 border border-emerald-800 animate-pulse">
-              LIVE SPEAKING
-            </span>
+
+            {/* Yield Indicator */}
+            {activeSpeaker.yieldType && (
+              <div className="p-2 rounded-lg bg-yellow-400/10 border border-yellow-400/30 text-xs font-bold flex items-center gap-1.5" style={{ color: dark ? '#fde047' : '#854d0e' }}>
+                <Share2 className="h-3.5 w-3.5" />
+                <span>
+                  Yielded floor to: <strong>{activeSpeaker.yieldType}</strong>
+                  {activeSpeaker.yieldTarget ? ` (${activeSpeaker.yieldTarget})` : ''}
+                </span>
+              </div>
+            )}
+
+            {/* Yield Actions */}
+            {(isChair || (isDelegate && activeSpeaker.uid === profile.uid)) && (
+              <div className="pt-2 border-t flex flex-wrap items-center gap-2" style={{ borderColor: dividerBorder }}>
+                <span className="text-[10px] font-bold uppercase" style={{ color: mutedText }}>
+                  Yield Floor:
+                </span>
+                <button
+                  onClick={() => handleYield('Chair')}
+                  className="px-2.5 py-1 rounded text-[11px] font-bold border hover:opacity-80 transition"
+                  style={{ background: dark ? '#27272a' : '#ffffff', borderColor: dividerBorder, color: headingColor }}
+                >
+                  To Chair
+                </button>
+                <button
+                  onClick={() => handleYield('Questions')}
+                  className="px-2.5 py-1 rounded text-[11px] font-bold border hover:opacity-80 transition"
+                  style={{ background: dark ? '#27272a' : '#ffffff', borderColor: dividerBorder, color: headingColor }}
+                >
+                  To Questions
+                </button>
+                <button
+                  onClick={() => setYieldModalOpen(true)}
+                  className="px-2.5 py-1 rounded text-[11px] font-bold border hover:opacity-80 transition"
+                  style={{ background: dark ? '#27272a' : '#ffffff', borderColor: dividerBorder, color: headingColor }}
+                >
+                  To Delegate…
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <p className="text-xs font-medium italic py-2" style={{ color: mutedText }}>
@@ -876,104 +1222,195 @@ const GeneralSpeakersListSection: React.FC<GeneralSpeakersListSectionProps> = ({
         )}
       </div>
 
-      {/* Horizontal Divider */}
-      <div className="border-t" style={{ borderColor: dividerBorder }} />
-
-      {/* 3. Delegate Controls */}
-      {isDelegate && (
-        <>
-          <div className="flex items-center justify-between py-1">
-            <div>
-              <span className="text-xs font-bold block" style={{ color: headingColor }}>
-                {userInQueue ? 'You are in the queue' : 'Request to Speak'}
-              </span>
-              <span className="text-[11px] font-medium" style={{ color: mutedText }}>
-                {userInQueue
-                  ? `Position: #${queueList.findIndex((s) => s.id === userInQueue.id) + 1}`
-                  : 'Raise your hand to be placed on the GSL'}
-              </span>
-            </div>
-
-            {userInQueue ? (
-              <button
-                onClick={handleLowerHand}
-                disabled={submittingHand}
-                className="px-4 py-2 rounded-xl text-xs font-bold border text-red-400 border-red-900/60 hover:bg-red-950 transition flex items-center gap-1.5"
-              >
-                <Hand className="h-3.5 w-3.5" /> Lower Hand
-              </button>
-            ) : (
-              <button
-                onClick={handleRaiseHand}
-                disabled={submittingHand}
-                className="px-4 py-2 rounded-xl text-xs font-extrabold shadow-sm transition flex items-center gap-1.5"
-                style={{
-                  background: dark ? '#27272a' : '#fef08a',
-                  color: dark ? '#ffffff' : '#172554',
-                  border: dark ? '1px solid #3f3f46' : '1px solid #fde047',
-                }}
-              >
-                <Hand className="h-3.5 w-3.5" /> Raise Hand
-              </button>
-            )}
+      {/* Yield Target Picker Modal */}
+      {yieldModalOpen && (
+        <div className="p-3 rounded-xl border space-y-2" style={{ background: dark ? '#27272a' : '#ffffff', borderColor: dividerBorder }}>
+          <span className="text-xs font-bold block" style={{ color: headingColor }}>
+            Select delegate to yield floor to:
+          </span>
+          <select
+            value={selectedYieldTarget}
+            onChange={(e) => setSelectedYieldTarget(e.target.value)}
+            className="w-full px-2.5 py-1.5 rounded-lg text-xs font-bold"
+            style={{ background: dark ? '#18181b' : '#faf8f5', border: `1px solid ${dividerBorder}`, color: headingColor }}
+          >
+            <option value="">-- Choose Country --</option>
+            {committeeDelegates.map((d) => (
+              <option key={d.id} value={`${d.country} (${d.name})`}>
+                {d.country} — {d.name}
+              </option>
+            ))}
+          </select>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              onClick={() => setYieldModalOpen(false)}
+              className="px-3 py-1 rounded text-xs font-bold"
+              style={{ color: mutedText }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleYield('Delegate')}
+              disabled={!selectedYieldTarget}
+              className="px-3 py-1 rounded text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
+            >
+              Confirm Yield
+            </button>
           </div>
-
-          {/* Horizontal Divider */}
-          <div className="border-t" style={{ borderColor: dividerBorder }} />
-        </>
+        </div>
       )}
 
-      {/* 4. Speakers Queue List */}
-      <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-        {speakerLoading ? (
-          <div className="py-8 text-center">
-            <Loader2 className="h-6 w-6 animate-spin mx-auto" style={{ color: dark ? '#ffffff' : '#172554' }} />
+      <div className="border-t" style={{ borderColor: dividerBorder }} />
+
+      {/* 3. Delegate Join/Leave GSL Controls */}
+      {isDelegate && (
+        <div className="flex items-center justify-between py-1">
+          <div>
+            <span className="text-xs font-bold block" style={{ color: headingColor }}>
+              {userInQueue ? 'You are on the Speakers List' : 'Join General Speakers List'}
+            </span>
+            <span className="text-[11px] font-medium" style={{ color: mutedText }}>
+              {userInQueue
+                ? `Current Position: #${waitingQueue.findIndex((s) => s.id === userInQueue.id) + 1}`
+                : 'Click below to be added to the queue'}
+            </span>
           </div>
-        ) : queueList.length === 0 ? (
-          <div className="py-8 text-center text-xs italic font-medium" style={{ color: mutedText }}>
-            Speakers queue is empty. Delegates can raise hands to join.
+
+          {userInQueue ? (
+            <button
+              onClick={handleWithdrawFromGSL}
+              disabled={submittingHand}
+              className="text-xs px-3 py-1.5 rounded-lg font-bold border border-red-800 text-red-400 hover:bg-red-950 transition"
+            >
+              Withdraw from GSL
+            </button>
+          ) : (
+            <button
+              onClick={handleAddMeToGSL}
+              disabled={submittingHand}
+              className="text-xs px-3 py-1.5 rounded-lg font-bold transition shadow-sm"
+              style={{
+                background: dark ? '#27272a' : '#fef08a',
+                color: dark ? '#ffffff' : '#172554',
+                border: dark ? '1px solid #3f3f46' : '1px solid #fde047',
+              }}
+            >
+              + Add Me to GSL
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 4. Chair Add Country to GSL */}
+      {isChair && (
+        <div className="flex items-center gap-2">
+          <select
+            value={manualCountry}
+            onChange={(e) => setManualCountry(e.target.value)}
+            className="flex-1 px-3 py-1.5 rounded-lg text-xs font-bold"
+            style={{
+              background: dark ? '#18181b' : '#faf8f5',
+              border: `1px solid ${dividerBorder}`,
+              color: headingColor,
+            }}
+          >
+            <option value="">-- Add Country to GSL --</option>
+            {committeeDelegates.map((d) => (
+              <option key={d.id} value={d.country}>
+                {d.country} ({d.name})
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleAddCountryToQueue}
+            disabled={!manualCountry}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50 transition shadow-sm"
+            style={{
+              background: dark ? '#27272a' : '#fef08a',
+              color: dark ? '#ffffff' : '#172554',
+              border: dark ? '1px solid #3f3f46' : '1px solid #fde047',
+            }}
+          >
+            Add Speaker
+          </button>
+        </div>
+      )}
+
+      <div className="border-t" style={{ borderColor: dividerBorder }} />
+
+      {/* 5. Speakers Queue List with Reordering */}
+      <div className="space-y-2">
+        <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: mutedText }}>
+          Speakers Queue
+        </span>
+
+        {speakerLoading ? (
+          <div className="py-6 flex justify-center">
+            <Loader2 className="h-6 w-6 animate-spin" style={{ color: dark ? '#ffffff' : '#172554' }} />
+          </div>
+        ) : waitingQueue.length === 0 ? (
+          <div className="py-6 text-center text-xs italic font-medium" style={{ color: mutedText }}>
+            Speakers List is currently empty.
           </div>
         ) : (
-          queueList.map((item, index) => {
-            const isSpeaking = item.status === 'speaking';
-            return (
+          <div className="space-y-2 max-h-72 overflow-y-auto">
+            {waitingQueue.map((s, idx) => (
               <div
-                key={item.id}
-                className="py-2.5 border-b flex items-center justify-between transition"
-                style={{ borderColor: dividerBorder }}
+                key={s.id}
+                className="flex items-center justify-between p-2.5 rounded-lg border text-xs transition"
+                style={{
+                  background: dark ? '#18181b' : '#faf8f5',
+                  borderColor: dividerBorder,
+                }}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                    style={{
-                      background: isSpeaking ? (dark ? '#ffffff' : '#172554') : (dark ? '#27272a' : '#e2e8f0'),
-                      color: isSpeaking ? (dark ? '#000000' : '#ffffff') : (dark ? '#ffffff' : '#334155'),
-                    }}
-                  >
-                    {index + 1}
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="font-mono font-bold text-[11px] w-5 text-center" style={{ color: mutedText }}>
+                    #{idx + 1}
                   </span>
                   <div className="min-w-0">
-                    <h5 className="font-bold text-xs sm:text-sm truncate" style={{ color: headingColor }}>
-                      {item.name}
-                    </h5>
-                    <p className="text-[11px] truncate opacity-80 font-medium" style={{ color: mutedText }}>
-                      {item.country} {isSpeaking && '· [Speaking]'}
-                    </p>
+                    <span className="font-bold truncate block" style={{ color: headingColor }}>
+                      {s.name}
+                    </span>
+                    <span className="text-[10px] font-semibold" style={{ color: dark ? '#a1a1aa' : '#1e3a8a' }}>
+                      {s.country}
+                    </span>
                   </div>
                 </div>
 
                 {isChair && (
-                  <button
-                    onClick={() => handleRemoveSpeaker(item.id)}
-                    className="text-xs p-1 text-zinc-500 hover:text-red-400 transition"
-                    title="Remove from queue"
-                  >
-                    <XCircle className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    {idx > 0 && (
+                      <button
+                        onClick={() => moveSpeakerInQueue(s.id, 'up', speakers)}
+                        title="Move Up"
+                        className="p-1 rounded hover:bg-zinc-800"
+                        style={{ color: mutedText }}
+                      >
+                        <ArrowUp className="h-3 w-3" />
+                      </button>
+                    )}
+                    {idx < waitingQueue.length - 1 && (
+                      <button
+                        onClick={() => moveSpeakerInQueue(s.id, 'down', speakers)}
+                        title="Move Down"
+                        className="p-1 rounded hover:bg-zinc-800"
+                        style={{ color: mutedText }}
+                      >
+                        <ArrowDown className="h-3 w-3" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => removeSpeakerFromQueue(s.id)}
+                      title="Remove Speaker"
+                      className="p-1 rounded text-red-400 hover:bg-red-950"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
                 )}
               </div>
-            );
-          })
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -981,7 +1418,7 @@ const GeneralSpeakersListSection: React.FC<GeneralSpeakersListSectionProps> = ({
 };
 
 // ---------------------------------------------------------------------------
-// 3. Cardless Motions & Caucuses Section (Divided by Horizontal Lines)
+// 3. Motions Section (Task 2 Fix)
 // ---------------------------------------------------------------------------
 
 interface MotionsSectionProps {
@@ -993,6 +1430,7 @@ interface MotionsSectionProps {
   dividerBorder: string;
   headingColor: string;
   mutedText: string;
+  onStartTimerForMotion: (motion: CommitteeMotion) => Promise<void>;
 }
 
 const MotionsSection: React.FC<MotionsSectionProps> = ({
@@ -1004,6 +1442,7 @@ const MotionsSection: React.FC<MotionsSectionProps> = ({
   dividerBorder,
   headingColor,
   mutedText,
+  onStartTimerForMotion,
 }) => {
   const [openSubmit, setOpenSubmit] = useState(false);
   const [topic, setTopic] = useState('');
@@ -1016,18 +1455,23 @@ const MotionsSection: React.FC<MotionsSectionProps> = ({
     e.preventDefault();
     if (!topic.trim()) return;
     setSubmitting(true);
-    await submitMotion(committeeId, {
-      proposerName: profile.name || profile.displayName,
-      proposerCountry: profile.country,
-      topic: topic.trim(),
-      totalTime: parseInt(totalTime, 10) * 60 || 600,
-      speakingTime: parseInt(speakingTime, 10) || 60,
-      type: motionType,
-      status: 'pending',
-    });
-    setTopic('');
-    setOpenSubmit(false);
-    setSubmitting(false);
+    try {
+      await submitMotion(committeeId, {
+        proposerName: profile.name || profile.displayName,
+        proposerCountry: profile.country,
+        topic: topic.trim(),
+        totalTime: parseInt(totalTime, 10) * 60 || 600,
+        speakingTime: parseInt(speakingTime, 10) || 60,
+        type: motionType,
+        status: 'pending',
+      });
+      setTopic('');
+      setOpenSubmit(false);
+    } catch (err) {
+      console.error('Error proposing motion:', err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -1038,40 +1482,43 @@ const MotionsSection: React.FC<MotionsSectionProps> = ({
           <h3 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight" style={{ color: headingColor }}>
             Motions &amp; Caucuses
           </h3>
+          <span
+            className="text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase"
+            style={{ background: dark ? '#18181b' : '#fef08a', color: headingColor }}
+          >
+            {motions.length}
+          </span>
         </div>
 
-        {profile.role === 'Delegate' && (
-          <button
-            onClick={() => setOpenSubmit(!openSubmit)}
-            className="text-xs font-bold px-3 py-1.5 rounded-lg border flex items-center gap-1 transition shadow-sm"
-            style={{
-              background: dark ? '#27272a' : '#fef08a',
-              color: dark ? '#ffffff' : '#172554',
-              borderColor: dark ? '#3f3f46' : '#fde047',
-            }}
-          >
-            <Plus className="h-3.5 w-3.5" /> Submit Motion
-          </button>
-        )}
+        <button
+          onClick={() => setOpenSubmit(!openSubmit)}
+          className="text-xs font-bold px-3 py-1.5 rounded-lg border flex items-center gap-1 transition shadow-sm"
+          style={{
+            background: dark ? '#27272a' : '#fef08a',
+            color: dark ? '#ffffff' : '#172554',
+            borderColor: dark ? '#3f3f46' : '#fde047',
+          }}
+        >
+          <Plus className="h-3.5 w-3.5" /> Submit Motion
+        </button>
       </div>
 
-      {/* Horizontal Divider */}
       <div className="border-t" style={{ borderColor: dividerBorder }} />
 
-      {/* 2. Delegate Submit Form */}
+      {/* 2. Submit Form */}
       {openSubmit && (
         <>
           <form onSubmit={handleSubmitMotion} className="space-y-3 py-2">
             <div>
               <label className="block text-[10px] font-bold mb-1" style={{ color: mutedText }}>
-                Motion Topic *
+                Motion Topic / Purpose *
               </label>
               <input
                 type="text"
                 required
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                placeholder="e.g. Allocation of resources"
+                placeholder="e.g. Humanitarian Aid and Infrastructure Recovery"
                 className="w-full px-3 py-2 rounded-lg text-xs font-medium"
                 style={{ background: dark ? '#18181b' : '#ffffff', border: `1px solid ${dividerBorder}`, color: dark ? '#ffffff' : '#172554' }}
               />
@@ -1085,7 +1532,7 @@ const MotionsSection: React.FC<MotionsSectionProps> = ({
                 <input
                   type="number"
                   min="1"
-                  max="30"
+                  max="45"
                   value={totalTime}
                   onChange={(e) => setTotalTime(e.target.value)}
                   className="w-full px-2.5 py-1.5 rounded-lg text-xs font-medium"
@@ -1122,6 +1569,8 @@ const MotionsSection: React.FC<MotionsSectionProps> = ({
                   <option value="Unmoderated Caucus">Unmoderated</option>
                   <option value="Consultation of the Whole">Consultation</option>
                   <option value="Formal Debate">Formal Debate</option>
+                  <option value="Closure of Debate">Closure of Debate</option>
+                  <option value="Adjournment">Adjournment</option>
                 </select>
               </div>
             </div>
@@ -1136,27 +1585,26 @@ const MotionsSection: React.FC<MotionsSectionProps> = ({
                 border: dark ? '1px solid #3f3f46' : '1px solid #fde047',
               }}
             >
-              {submitting ? 'Submitting…' : 'Submit Motion to Chair'}
+              {submitting ? 'Submitting Motion…' : 'Submit Motion to Committee'}
             </button>
           </form>
 
-          {/* Horizontal Divider */}
           <div className="border-t" style={{ borderColor: dividerBorder }} />
         </>
       )}
 
       {/* 3. Motions List */}
-      <div className="space-y-3 max-h-60 overflow-y-auto">
+      <div className="space-y-3 max-h-72 overflow-y-auto">
         {motions.length === 0 ? (
           <div className="py-6 text-center text-xs italic font-medium" style={{ color: mutedText }}>
-            No motions proposed yet for this session.
+            No motions proposed yet for this committee.
           </div>
         ) : (
           motions.map((m) => (
             <div
               key={m.id}
-              className="py-3 border-b flex items-center justify-between gap-3 text-xs"
-              style={{ borderColor: dividerBorder }}
+              className="p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+              style={{ background: dark ? '#18181b' : '#faf8f5', borderColor: dividerBorder }}
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
@@ -1164,42 +1612,64 @@ const MotionsSection: React.FC<MotionsSectionProps> = ({
                     {m.type}
                   </span>
                   <span style={{ color: mutedText }}>·</span>
-                  <span style={{ color: mutedText }}>{Math.floor(m.totalTime / 60)}m / {m.speakingTime}s</span>
+                  <span style={{ color: mutedText }}>{Math.floor(m.totalTime / 60)}m total / {m.speakingTime}s speech</span>
                 </div>
-                <h5 className="font-bold truncate mt-0.5" style={{ color: headingColor }}>
+                <h5 className="font-bold truncate mt-0.5 text-sm" style={{ color: headingColor }}>
                   "{m.topic}"
                 </h5>
                 <p className="text-[10px] font-medium" style={{ color: mutedText }}>
-                  By: {m.proposerName} ({m.proposerCountry})
+                  Proposed by: {m.proposerName} ({m.proposerCountry})
                 </p>
               </div>
 
-              {isChair && m.status === 'pending' ? (
-                <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {isChair && m.status === 'pending' && (
+                  <>
+                    <button
+                      onClick={() => updateMotionStatus(m.id, 'passed')}
+                      className="px-2.5 py-1 rounded-md text-[10px] font-bold text-emerald-400 border border-emerald-800 hover:bg-emerald-950 transition"
+                    >
+                      Pass
+                    </button>
+                    <button
+                      onClick={() => updateMotionStatus(m.id, 'failed')}
+                      className="px-2.5 py-1 rounded-md text-[10px] font-bold text-red-400 border border-red-800 hover:bg-red-950 transition"
+                    >
+                      Fail
+                    </button>
+                  </>
+                )}
+
+                {isChair && (
                   <button
-                    onClick={() => updateMotionStatus(m.id, 'passed')}
-                    className="px-2.5 py-1 rounded-md text-[10px] font-bold text-emerald-400 border border-emerald-800 hover:bg-emerald-950 transition"
+                    onClick={() => onStartTimerForMotion(m)}
+                    title="Set debate timer from this motion"
+                    className="px-2 py-1 rounded text-[10px] font-bold bg-yellow-400/20 text-yellow-600 dark:text-yellow-300 border border-yellow-400/40"
                   >
-                    Pass
+                    Timer ▶
                   </button>
-                  <button
-                    onClick={() => updateMotionStatus(m.id, 'failed')}
-                    className="px-2.5 py-1 rounded-md text-[10px] font-bold text-red-400 border border-red-800 hover:bg-red-950 transition"
-                  >
-                    Fail
-                  </button>
-                </div>
-              ) : (
+                )}
+
                 <span
                   className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase"
                   style={{
-                    background: m.status === 'passed' ? '#065f46' : m.status === 'failed' ? '#7f1d1d' : (dark ? '#18181b' : '#fef08a'),
+                    background: m.status === 'passed' ? '#065f46' : m.status === 'failed' ? '#7f1d1d' : (dark ? '#27272a' : '#fef08a'),
                     color: m.status === 'passed' ? '#a7f3d0' : m.status === 'failed' ? '#fecaca' : (dark ? '#ffffff' : '#172554'),
                   }}
                 >
                   {m.status}
                 </span>
-              )}
+
+                {isChair && (
+                  <button
+                    onClick={() => deleteMotion(m.id)}
+                    className="p-1 text-red-400 hover:bg-red-950 rounded"
+                    title="Delete Motion"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
             </div>
           ))
         )}
@@ -1209,70 +1679,108 @@ const MotionsSection: React.FC<MotionsSectionProps> = ({
 };
 
 // ---------------------------------------------------------------------------
-// 4. Cardless Committee Roster Section
+// 4. Committee Roster Section (Task 3 Real-Time Hand Sync)
 // ---------------------------------------------------------------------------
 
 const CommitteeRosterSection: React.FC<{
   activeCommittee: string;
+  raisedHands: RaisedHandItem[];
+  speakers: SpeakerQueueItem[];
   dark: boolean;
   dividerBorder: string;
   headingColor: string;
   mutedText: string;
-}> = ({ activeCommittee, dark, dividerBorder, headingColor, mutedText }) => {
+}> = ({ activeCommittee, raisedHands, speakers, dark, dividerBorder, headingColor, mutedText }) => {
   const delegates = ROSTER_MASTER_DATA.filter((r) => r.committee === activeCommittee);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between">
         <h3 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight" style={{ color: headingColor }}>
           {activeCommittee} — Official Delegate Roster
         </h3>
+        <span className="text-xs font-bold" style={{ color: mutedText }}>
+          {delegates.length} Delegates Assigned
+        </span>
       </div>
 
       <div className="border-t" style={{ borderColor: dividerBorder }} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {delegates.map((entry) => (
-          <div
-            key={entry.id}
-            className="pb-4 border-b flex items-center justify-between"
-            style={{ borderColor: dividerBorder }}
-          >
-            <div>
-              <h4 className="font-bold text-sm" style={{ color: headingColor }}>
-                {entry.name}
-              </h4>
-              <p className="text-xs font-semibold" style={{ color: dark ? '#ffffff' : '#1e3a8a' }}>
-                {entry.country}
-              </p>
-            </div>
-            <span
-              className="text-[10px] font-mono px-2.5 py-0.5 rounded-full uppercase font-medium"
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {delegates.map((entry) => {
+          const isHandUp = raisedHands.some((h) => h.country === entry.country);
+          const speakerItem = speakers.find((s) => s.country === entry.country && s.status !== 'completed');
+          const isSpeaking = speakerItem?.status === 'speaking';
+          const queueIndex = speakers.filter((s) => s.status === 'waiting').findIndex((s) => s.country === entry.country);
+
+          return (
+            <div
+              key={entry.id}
+              className={`p-3.5 rounded-xl border flex items-center justify-between transition ${
+                isHandUp ? 'ring-2 ring-yellow-400 shadow-md' : ''
+              }`}
               style={{
-                background: dark ? '#18181b' : '#fef08a',
-                color: dark ? '#ffffff' : '#172554',
-                border: `1px solid ${dividerBorder}`,
+                background: dark ? '#18181b' : '#faf8f5',
+                borderColor: isHandUp ? (dark ? '#eab308' : '#ca8a04') : dividerBorder,
               }}
             >
-              {entry.role}
-            </span>
-          </div>
-        ))}
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <h4 className="font-bold text-sm" style={{ color: headingColor }}>
+                    {entry.name}
+                  </h4>
+                  {isHandUp && (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-yellow-400 text-yellow-950 animate-bounce">
+                      ✋ HAND RAISED
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs font-semibold" style={{ color: dark ? '#ffffff' : '#1e3a8a' }}>
+                  {entry.country}
+                </p>
+              </div>
+
+              <div className="flex flex-col items-end gap-1">
+                {isSpeaking && (
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-800">
+                    🎤 Speaking
+                  </span>
+                )}
+                {queueIndex !== -1 && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-zinc-800 text-zinc-300">
+                    GSL #{queueIndex + 1}
+                  </span>
+                )}
+                <span
+                  className="text-[10px] font-mono px-2 py-0.5 rounded-full uppercase font-medium"
+                  style={{
+                    background: dark ? '#27272a' : '#ffffff',
+                    color: mutedText,
+                    border: `1px solid ${dividerBorder}`,
+                  }}
+                >
+                  {entry.role}
+                </span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 };
 
 // ---------------------------------------------------------------------------
-// 5. Cardless Create Session Section (Chair / Organiser Only)
+// 5. Create Session Section (Task 1 & Task 7)
 // ---------------------------------------------------------------------------
 
 const CreateSessionSection: React.FC<{
+  committeeId: string;
   dark: boolean;
   dividerBorder: string;
   uid: string;
   displayName: string;
-}> = ({ dark, dividerBorder, uid, displayName }) => {
+}> = ({ committeeId, dark, dividerBorder, uid, displayName }) => {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -1290,8 +1798,10 @@ const CreateSessionSection: React.FC<{
     if (!title.trim()) return;
     setSubmitting(true);
     await createVotingSession({
+      committeeId,
       title: title.trim(),
       description: description.trim(),
+      votingType: isSubstantive ? 'Substantive' : 'Procedural',
       isSubstantive,
       createdBy: uid,
       createdByName: displayName,
@@ -1314,7 +1824,7 @@ const CreateSessionSection: React.FC<{
       >
         <span className="flex items-center gap-2 font-serif text-2xl font-normal">
           <Plus className="h-5 w-5" style={{ color: dark ? '#ffffff' : '#172554' }} />
-          Create New Voting Session
+          Create New Voting Session ({committeeId})
         </span>
         {open ? <ChevronUp className="h-5 w-5" style={{ color: dark ? '#a1a1aa' : 'inherit' }} /> : <ChevronDown className="h-5 w-5" style={{ color: dark ? '#a1a1aa' : 'inherit' }} />}
       </button>
@@ -1329,7 +1839,7 @@ const CreateSessionSection: React.FC<{
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Resolution on Global Preparedness"
+              placeholder="e.g. Draft Resolution 1.1 on Sustainable Climate Action"
               className="w-full px-4 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-300 font-medium"
               style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: inputText }}
             />
@@ -1345,7 +1855,7 @@ const CreateSessionSection: React.FC<{
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              placeholder="Brief summary of the motion…"
+              placeholder="Brief summary of the resolution operative clauses…"
               className="w-full px-4 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-300 resize-none font-medium"
               style={{ background: inputBg, border: `1px solid ${inputBorder}`, color: inputText }}
             />
@@ -1356,7 +1866,7 @@ const CreateSessionSection: React.FC<{
           <div className="flex flex-wrap gap-6">
             <div>
               <label className="block text-xs font-bold mb-1.5" style={{ color: labelColor }}>
-                Vote Type
+                Voting Rule Type
               </label>
               <div className="flex gap-2">
                 <button
@@ -1369,7 +1879,7 @@ const CreateSessionSection: React.FC<{
                     border: `1px solid ${!isSubstantive ? (dark ? '#3f3f46' : '#fde047') : inputBorder}`,
                   }}
                 >
-                  Procedural
+                  Procedural (Simple Majority)
                 </button>
                 <button
                   type="button"
@@ -1381,19 +1891,19 @@ const CreateSessionSection: React.FC<{
                     border: `1px solid ${isSubstantive ? (dark ? '#3f3f46' : '#fde047') : inputBorder}`,
                   }}
                 >
-                  Substantive (P5 Veto)
+                  Substantive (2/3 Majority)
                 </button>
               </div>
             </div>
 
             <div>
               <label className="block text-xs font-bold mb-1.5" style={{ color: labelColor }}>
-                Council / Committee Members
+                Total Committee Members
               </label>
               <input
                 type="number"
                 min="1"
-                max="50"
+                max="100"
                 value={members}
                 onChange={(e) => setMembers(e.target.value)}
                 className="w-20 px-3 py-1.5 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-yellow-300"
@@ -1401,22 +1911,6 @@ const CreateSessionSection: React.FC<{
               />
             </div>
           </div>
-
-          {isSubstantive && (
-            <div
-              className="text-xs font-bold p-3 rounded-lg flex items-start gap-2"
-              style={{
-                background: dark ? '#18181b' : '#fef08a33',
-                color: dark ? '#ffffff' : '#172554',
-                border: `1px solid ${dark ? '#3f3f46' : '#fde047'}`,
-              }}
-            >
-              <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-              <span>
-                Substantive votes require ≥9 YES votes and are subject to P5 veto. Any P5 member voting NO will veto the resolution.
-              </span>
-            </div>
-          )}
 
           <div className="border-t" style={{ borderColor: dividerBorder }} />
 
@@ -1432,10 +1926,10 @@ const CreateSessionSection: React.FC<{
           >
             {submitting ? (
               <span className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" /> Creating…
+                <Loader2 className="h-4 w-4 animate-spin" /> Initializing…
               </span>
             ) : (
-              'Create Session'
+              'Start Voting Session'
             )}
           </button>
         </div>
@@ -1445,7 +1939,7 @@ const CreateSessionSection: React.FC<{
 };
 
 // ---------------------------------------------------------------------------
-// 6. Cardless Session Item Component (Divided by Horizontal Lines)
+// 6. Session Item Component (Task 1 & Task 7 Live Synchronized Voting)
 // ---------------------------------------------------------------------------
 
 const SessionItem: React.FC<{
@@ -1500,15 +1994,13 @@ const SessionItem: React.FC<{
     session.status === 'closed'
       ? session.result?.status === 'PASSED'
         ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-        : session.result?.status === 'VETOED'
-          ? <ShieldAlert className="h-5 w-5 text-red-500" />
-          : <XCircle className="h-5 w-5 text-red-500" />
-      : <Clock className="h-5 w-5" style={{ color: dark ? '#ffffff' : '#172554' }} />;
+        : <XCircle className="h-5 w-5 text-red-500" />
+      : <Clock className="h-5 w-5 animate-spin text-yellow-500" />;
 
   const statusLabel =
     session.status === 'closed'
       ? session.result?.status || 'CLOSED'
-      : 'OPEN';
+      : 'VOTING OPEN';
 
   return (
     <div className="border-b pb-8 space-y-4" style={{ borderColor: dividerBorder }}>
@@ -1527,15 +2019,15 @@ const SessionItem: React.FC<{
               <span
                 className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase"
                 style={{
-                  background: dark ? '#18181b' : '#fef08a',
-                  color: dark ? '#ffffff' : '#172554',
+                  background: session.status === 'open' ? '#059669' : (dark ? '#18181b' : '#fef08a'),
+                  color: session.status === 'open' ? '#ffffff' : (dark ? '#ffffff' : '#172554'),
                   border: `1px solid ${dividerBorder}`,
                 }}
               >
                 {statusLabel}
               </span>
               <span className="text-[10px] font-medium" style={{ color: mutedText }}>
-                {session.isSubstantive ? 'Substantive (P5 Veto)' : 'Procedural'} ·{' '}
+                {session.isSubstantive ? 'Substantive (2/3 Majority)' : 'Procedural (Simple Majority)'} ·{' '}
                 {voteArray.length} vote{voteArray.length !== 1 ? 's' : ''} cast
               </span>
             </div>
@@ -1558,9 +2050,9 @@ const SessionItem: React.FC<{
 
           {/* 3. Vote Tally */}
           <div className="flex gap-4 flex-wrap">
-            <TallyBadge label="YES" count={yesCount} color={dark ? '#ffffff' : '#172554'} dark={dark} dividerBorder={dividerBorder} />
-            <TallyBadge label="NO" count={noCount} color={dark ? '#ffffff' : '#dc2626'} dark={dark} dividerBorder={dividerBorder} />
-            <TallyBadge label="ABSTAIN" count={abstainCount} color={dark ? '#a1a1aa' : '#64748b'} dark={dark} dividerBorder={dividerBorder} />
+            <TallyBadge label="IN FAVOR (YES)" count={yesCount} color="#10b981" dark={dark} dividerBorder={dividerBorder} />
+            <TallyBadge label="AGAINST (NO)" count={noCount} color="#ef4444" dark={dark} dividerBorder={dividerBorder} />
+            <TallyBadge label="ABSTAIN" count={abstainCount} color="#94a3b8" dark={dark} dividerBorder={dividerBorder} />
           </div>
 
           <div className="border-t" style={{ borderColor: dividerBorder }} />
@@ -1570,7 +2062,7 @@ const SessionItem: React.FC<{
             <>
               <div className="space-y-1">
                 <p className="text-xs font-bold mb-2" style={{ color: mutedText }}>
-                  Votes Cast
+                  Live Votes Cast
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {voteArray.map((v) => (
@@ -1588,14 +2080,11 @@ const SessionItem: React.FC<{
                       <span
                         className="font-extrabold ml-1"
                         style={{
-                          color: v.vote === 'YES' ? (dark ? '#ffffff' : '#172554') : v.vote === 'NO' ? '#ef4444' : '#a1a1aa',
+                          color: v.vote === 'YES' ? '#10b981' : v.vote === 'NO' ? '#ef4444' : '#94a3b8',
                         }}
                       >
                         {v.vote}
                       </span>
-                      {v.isP5 && (
-                        <span className="text-[9px] font-bold ml-0.5" style={{ color: dark ? '#ffffff' : '#172554' }}>P5</span>
-                      )}
                     </span>
                   ))}
                 </div>
@@ -1610,35 +2099,33 @@ const SessionItem: React.FC<{
             <>
               <div className="space-y-2">
                 <p className="text-xs font-bold" style={{ color: mutedText }}>
-                  Cast your vote:
+                  Cast your official vote:
                 </p>
                 <div className="flex gap-2">
-                  {(['YES', 'NO', 'ABSTAIN'] as const).map((choice) => (
+                  <button
+                    onClick={() => handleCastVote('YES')}
+                    disabled={castingVote}
+                    className="px-4 py-2 rounded-lg font-bold text-sm transition text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm"
+                  >
+                    In Favor (Yes)
+                  </button>
+                  <button
+                    onClick={() => handleCastVote('NO')}
+                    disabled={castingVote}
+                    className="px-4 py-2 rounded-lg font-bold text-sm transition text-white bg-red-600 hover:bg-red-700 shadow-sm"
+                  >
+                    Against (No)
+                  </button>
+                  {session.isSubstantive && (
                     <button
-                      key={choice}
-                      onClick={() => handleCastVote(choice)}
+                      onClick={() => handleCastVote('ABSTAIN')}
                       disabled={castingVote}
-                      className="px-4 py-2 rounded-lg font-bold text-sm transition disabled:opacity-50 shadow-sm"
-                      style={{
-                        background: dark
-                          ? (choice === 'YES' ? '#27272a' : choice === 'NO' ? '#000000' : '#18181b')
-                          : (choice === 'YES' ? '#fef08a' : choice === 'NO' ? '#fee2e2' : '#faf8f5'),
-                        color: dark
-                          ? '#ffffff'
-                          : (choice === 'YES' ? '#172554' : choice === 'NO' ? '#dc2626' : '#475569'),
-                        border: `1px solid ${dark ? '#3f3f46' : (choice === 'YES' ? '#fde047' : '#cbd5e1')}`,
-                      }}
+                      className="px-4 py-2 rounded-lg font-bold text-sm transition text-zinc-300 bg-zinc-700 hover:bg-zinc-600 shadow-sm"
                     >
-                      {castingVote ? <Loader2 className="h-4 w-4 animate-spin" /> : choice}
+                      Abstain
                     </button>
-                  ))}
+                  )}
                 </div>
-                {profile.isP5 && session.isSubstantive && (
-                  <p className="text-xs font-bold flex items-center gap-1" style={{ color: dark ? '#ffffff' : '#172554' }}>
-                    <AlertTriangle className="h-3 w-3" />
-                    As a P5 member, your NO vote will veto this substantive resolution.
-                  </p>
-                )}
               </div>
 
               <div className="border-t" style={{ borderColor: dividerBorder }} />
@@ -1652,7 +2139,7 @@ const SessionItem: React.FC<{
                 className="text-sm py-2 font-medium"
                 style={{ color: dark ? '#ffffff' : '#172554' }}
               >
-                You voted: <strong>{myVote.vote}</strong>
+                Your vote has been cast: <strong>{myVote.vote}</strong>
               </div>
 
               <div className="border-t" style={{ borderColor: dividerBorder }} />
@@ -1665,7 +2152,7 @@ const SessionItem: React.FC<{
               <button
                 onClick={handleClose}
                 disabled={closing}
-                className="px-5 py-2 rounded-lg font-bold text-sm transition disabled:opacity-50 shadow-sm"
+                className="px-5 py-2.5 rounded-lg font-bold text-sm transition disabled:opacity-50 shadow-sm"
                 style={{
                   background: dark ? '#27272a' : '#fef08a',
                   color: dark ? '#ffffff' : '#172554',
@@ -1674,10 +2161,10 @@ const SessionItem: React.FC<{
               >
                 {closing ? (
                   <span className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Evaluating…
+                    <Loader2 className="h-4 w-4 animate-spin" /> Finalizing Tally…
                   </span>
                 ) : (
-                  'Close Voting & Evaluate'
+                  'Close Voting & Finalize Outcome'
                 )}
               </button>
 
@@ -1691,16 +2178,13 @@ const SessionItem: React.FC<{
               <div
                 className="p-4 rounded-xl border text-sm font-medium"
                 style={{
-                  background: dark ? '#18181b' : (session.result.status === 'PASSED' ? '#f0fdf4' : session.result.status === 'VETOED' ? '#fef2f2' : '#fff7ed'),
-                  borderColor: dark ? '#3f3f46' : (session.result.status === 'PASSED' ? '#bbf7d0' : session.result.status === 'VETOED' ? '#fecaca' : '#fed7aa'),
-                  color: dark ? '#ffffff' : (session.result.status === 'PASSED' ? '#166534' : session.result.status === 'VETOED' ? '#991b1b' : '#9a3412'),
+                  background: dark ? '#18181b' : (session.result.status === 'PASSED' ? '#f0fdf4' : '#fef2f2'),
+                  borderColor: dark ? '#3f3f46' : (session.result.status === 'PASSED' ? '#bbf7d0' : '#fecaca'),
+                  color: dark ? '#ffffff' : (session.result.status === 'PASSED' ? '#166534' : '#991b1b'),
                 }}
               >
                 <p className="font-bold mb-1" style={{ color: dark ? '#ffffff' : undefined }}>
-                  {session.result.status === 'PASSED' && '✅ '}
-                  {session.result.status === 'VETOED' && '🛑 '}
-                  {session.result.status === 'FAILED' && '❌ '}
-                  Result: {session.result.status}
+                  {session.result.status === 'PASSED' ? '✅ Resolution Passed' : '❌ Resolution Failed'}
                 </p>
                 <p>{session.result.reason}</p>
               </div>
@@ -1710,7 +2194,7 @@ const SessionItem: React.FC<{
           )}
 
           <p className="text-[10px] font-medium" style={{ color: mutedText }}>
-            Created by {session.createdByName} · {new Date(session.createdAt).toLocaleString()}
+            Initialized by {session.createdByName} · {new Date(session.createdAt).toLocaleString()}
           </p>
         </div>
       )}

@@ -1,9 +1,25 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { Resend } from 'resend';
+
 // ---------------------------------------------------------------------------
 // Vercel Serverless Function: /api/send-invite
-// Securely dispatches official personalized HTML reminder & assignment emails
+// Securely dispatches official personalized HTML reminder & assignment emails via Resend
 // ---------------------------------------------------------------------------
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // CORS Headers
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+  );
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' });
@@ -18,9 +34,9 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const cleanEmail = email.toLowerCase().trim();
+    const cleanEmail = String(email).toLowerCase().trim();
     const targetUrl = portalUrl || process.env.VITE_PORTAL_URL || 'https://flymun.vercel.app';
-    const apiKey = process.env.RESEND_API_KEY;
+    const apiKey = (process.env.RESEND_API_KEY || '').trim();
 
     const emailSubject = `Conference Reminder & Official Credentials: ${name} (${role})`;
 
@@ -55,7 +71,7 @@ export default async function handler(req: any, res: any) {
           </div>
 
           <div class="alert-box">
-            🔔 Official Conference Reminder & Credentials
+             Official Conference Reminder & Credentials
           </div>
 
           <p style="font-size: 15px; line-height: 1.6; margin-bottom: 14px;">
@@ -101,42 +117,38 @@ export default async function handler(req: any, res: any) {
       </html>
     `;
 
-    // ── Dispatched via Resend REST API if API Key is set ──────────────────
-    if (apiKey) {
-      const response = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: 'FLY MUN <onboarding@resend.dev>',
-          to: [cleanEmail],
-          subject: emailSubject,
-          html: emailHtml,
-        }),
+    // ── Resend API Dispatch ────────────────────────────────────────────────
+    if (apiKey && apiKey !== 're_your_api_key_here') {
+      const resend = new Resend(apiKey);
+      const fromSender = (process.env.RESEND_FROM || 'FLY MUN <onboarding@resend.dev>').trim();
+
+      const { data, error } = await resend.emails.send({
+        from: fromSender,
+        to: [cleanEmail],
+        replyTo: "futureleadersyouthemail@gmail.com",
+        subject: emailSubject,
+        html: emailHtml,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        return res.status(response.status).json({
-          error: data.message || 'Failed to dispatch email via Resend API.',
+      if (error) {
+        console.error('Resend dispatch error:', error);
+        return res.status(400).json({
+          error: error.message || 'Failed to dispatch email via Resend API.',
         });
       }
 
       return res.status(200).json({
         success: true,
         message: `Reminder email successfully dispatched to ${cleanEmail}`,
-        id: data.id,
+        id: data?.id,
       });
     } else {
-      // Graceful fallback for local development or simulated mode
+      // Fallback if no valid API key is set yet
       console.log(`[SIMULATED EMAIL DISPATCH] To: ${cleanEmail} | Subject: ${emailSubject}`);
       return res.status(200).json({
         success: true,
         simulated: true,
-        message: `Reminder email processed for ${cleanEmail} (Simulated mode: add RESEND_API_KEY in Vercel to send live emails).`,
+        message: `Simulated dispatch for ${cleanEmail}. Add RESEND_API_KEY in Vercel to send live emails.`,
       });
     }
   } catch (error: any) {

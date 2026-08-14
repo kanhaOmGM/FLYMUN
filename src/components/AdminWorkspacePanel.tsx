@@ -17,6 +17,7 @@ import type { UserProfile, MUNState, CommitteeTimerState, CommitteeMotion } from
 import { setMUNState, subscribeToMUNState } from '../services/systemService';
 import { ROSTER_MASTER_DATA, COMMITTEES, type CommitteeName } from '../data/rosterData';
 import { subscribeToTimer, subscribeToMotions } from '../services/committeeService';
+import { adminRegisterParticipant } from '../services/userService';
 
 interface AdminWorkspacePanelProps {
   profile: UserProfile;
@@ -578,6 +579,255 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
         )}
       </div>
 
+      {/* ── Section 3: Add Participant & Dispatch Test Invite (Task 6) ────── */}
+      <AddParticipantSection
+        dark={dark}
+        panelBg={panelBg}
+        panelBorder={panelBorder}
+        headingColor={headingColor}
+        mutedText={mutedText}
+        onParticipantAdded={(logMsg) => {
+          setEmailLogs((prev) => [logMsg, ...prev]);
+        }}
+      />
+
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Add Participant & Instant Email Dispatcher Component (Task 6)
+// ---------------------------------------------------------------------------
+
+const AddParticipantSection: React.FC<{
+  dark: boolean;
+  panelBg: string;
+  panelBorder: string;
+  headingColor: string;
+  mutedText: string;
+  onParticipantAdded: (log: string) => void;
+}> = ({ dark, panelBg, panelBorder, headingColor, mutedText, onParticipantAdded }) => {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<'Delegate' | 'Chair' | 'Faculty Advisor' | 'Observer' | 'Event Organiser'>('Delegate');
+  const [committee, setCommittee] = useState<string>(COMMITTEES[0]);
+  const [country, setCountry] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim()) return;
+
+    setSubmitting(true);
+    setStatusMessage(null);
+
+    try {
+      // 1. Write participant to Firestore
+      await adminRegisterParticipant({
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        role,
+        committee,
+        country: country.trim() || 'General Representation',
+      });
+
+      // 2. Dispatch official invite email via Resend API
+      const res = await fetch('/api/send-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          name: name.trim(),
+          role,
+          committee,
+          country: country.trim() || 'General Representation',
+          portalUrl: window.location.origin,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        const log = `[${new Date().toLocaleTimeString()}] Registered & dispatched invite to ${name} (${email}) - Resend ID: ${data.id || 'simulated'}`;
+        onParticipantAdded(log);
+        setStatusMessage({
+          type: 'success',
+          text: `Participant ${name} successfully registered in Firestore and invite email dispatched to ${email}!`,
+        });
+        // Reset form
+        setName('');
+        setEmail('');
+        setCountry('');
+      } else {
+        setStatusMessage({
+          type: 'error',
+          text: `Participant saved, but email dispatch failed: ${data.error || 'Check Resend credentials'}`,
+        });
+      }
+    } catch (err: any) {
+      console.error('Add participant error:', err);
+      setStatusMessage({
+        type: 'error',
+        text: `Error registering participant: ${err?.message || 'Check database permissions'}`,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      className="rounded-3xl border p-6 sm:p-8 shadow-md transition-colors duration-300 space-y-6"
+      style={{ background: panelBg, borderColor: panelBorder }}
+    >
+      <div>
+        <h3 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight" style={{ color: headingColor }}>
+          Add Participant &amp; Dispatch Live Test Invite
+        </h3>
+        <p className="text-xs sm:text-sm font-medium mt-1" style={{ color: mutedText }}>
+          Manually register a new delegate, chair, or observer, assign their seat in Firestore, and trigger an automated invitation email via Resend.
+        </p>
+      </div>
+
+      {statusMessage && (
+        <div
+          className={`p-4 rounded-xl border text-xs sm:text-sm font-bold flex items-center gap-2 ${
+            statusMessage.type === 'success'
+              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-700'
+              : 'bg-red-500/10 text-red-400 border-red-700'
+          }`}
+        >
+          {statusMessage.type === 'success' ? '✓ ' : '⚠ '}
+          {statusMessage.text}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-bold mb-1.5" style={{ color: headingColor }}>
+              Full Participant Name *
+            </label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Eleanor Vance"
+              className="w-full px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-400"
+              style={{
+                background: dark ? '#18181b' : '#faf8f5',
+                border: `1px solid ${panelBorder}`,
+                color: headingColor,
+              }}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold mb-1.5" style={{ color: headingColor }}>
+              Email Address *
+            </label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="e.g. delegate@university.edu"
+              className="w-full px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-400"
+              style={{
+                background: dark ? '#18181b' : '#faf8f5',
+                border: `1px solid ${panelBorder}`,
+                color: headingColor,
+              }}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold mb-1.5" style={{ color: headingColor }}>
+              Conference Role *
+            </label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as any)}
+              className="w-full px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold focus:outline-none"
+              style={{
+                background: dark ? '#18181b' : '#faf8f5',
+                border: `1px solid ${panelBorder}`,
+                color: headingColor,
+              }}
+            >
+              <option value="Delegate">Delegate</option>
+              <option value="Chair">Committee Chair</option>
+              <option value="Faculty Advisor">Faculty Advisor</option>
+              <option value="Observer">Observer / Guest</option>
+              <option value="Event Organiser">Event Organiser / Admin</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold mb-1.5" style={{ color: headingColor }}>
+              Assigned Committee *
+            </label>
+            <select
+              value={committee}
+              onChange={(e) => setCommittee(e.target.value)}
+              className="w-full px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold focus:outline-none"
+              style={{
+                background: dark ? '#18181b' : '#faf8f5',
+                border: `1px solid ${panelBorder}`,
+                color: headingColor,
+              }}
+            >
+              {COMMITTEES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-bold mb-1.5" style={{ color: headingColor }}>
+              Country / Agency Representation *
+            </label>
+            <input
+              type="text"
+              required
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              placeholder="e.g. Japan, Canada, World Health Organization Expert"
+              className="w-full px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-400"
+              style={{
+                background: dark ? '#18181b' : '#faf8f5',
+                border: `1px solid ${panelBorder}`,
+                color: headingColor,
+              }}
+            />
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={submitting || !name.trim() || !email.trim()}
+          className="px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition flex items-center gap-2 shadow-sm disabled:opacity-50"
+          style={{
+            background: dark ? '#27272a' : '#fef08a',
+            color: dark ? '#ffffff' : '#172554',
+            border: dark ? '1px solid #3f3f46' : '1px solid #fde047',
+          }}
+        >
+          {submitting ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Registering &amp; Dispatching…
+            </>
+          ) : (
+            <>
+              <Send className="h-4 w-4" /> Save Participant &amp; Dispatch Invite Email
+            </>
+          )}
+        </button>
+      </form>
     </div>
   );
 };

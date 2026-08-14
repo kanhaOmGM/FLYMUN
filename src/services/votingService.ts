@@ -22,16 +22,20 @@ const sessionsCol = () => collection(db, 'voting_sessions');
 // ── Create ──────────────────────────────────────────────────────────────────
 
 export async function createVotingSession(data: {
+  committeeId?: string;
   title: string;
   description: string;
+  votingType?: 'Procedural' | 'Substantive';
   isSubstantive: boolean;
   createdBy: string;
   createdByName: string;
   totalCouncilMembers?: number;
 }): Promise<string> {
   const docRef = await addDoc(sessionsCol(), {
+    committeeId: data.committeeId || 'All',
     title: data.title,
     description: data.description,
+    votingType: data.votingType || (data.isSubstantive ? 'Substantive' : 'Procedural'),
     isSubstantive: data.isSubstantive,
     createdBy: data.createdBy,
     createdByName: data.createdByName,
@@ -87,10 +91,10 @@ export async function closeAndEvaluate(
 
 export function subscribeToSessions(
   callback: (sessions: VotingSession[]) => void,
+  committeeId?: string,
 ): () => void {
-  const q = query(sessionsCol(), orderBy('createdAt', 'desc'));
-  return onSnapshot(q, (snapshot) => {
-    const sessions: VotingSession[] = snapshot.docs.map((d) => {
+  return onSnapshot(sessionsCol(), (snapshot) => {
+    let sessions: VotingSession[] = snapshot.docs.map((d) => {
       const data = d.data();
       return {
         ...data,
@@ -98,13 +102,24 @@ export function subscribeToSessions(
         createdAt:
           data.createdAt instanceof Timestamp
             ? data.createdAt.toMillis()
-            : Date.now(),
+            : (typeof data.createdAt === 'number' ? data.createdAt : Date.now()),
         closedAt:
           data.closedAt instanceof Timestamp
             ? data.closedAt.toMillis()
-            : undefined,
+            : (typeof data.closedAt === 'number' ? data.closedAt : undefined),
       } as VotingSession;
     });
+
+    // Filter by committee if specified
+    if (committeeId && committeeId !== 'All') {
+      sessions = sessions.filter(
+        (s) => !s.committeeId || s.committeeId === 'All' || s.committeeId === committeeId
+      );
+    }
+
+    // Sort descending by creation timestamp in memory
+    sessions.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
     callback(sessions);
   });
 }

@@ -2,39 +2,30 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
+    // Helper function
     function isAuthenticated() {
       return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
     }
 
     // =========================================================================
     // 1. System Configuration & Global Lock Switch (`systemConfig/munState`)
     // =========================================================================
     match /systemConfig/{docId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read, write: if isAuthenticated();
     }
 
     // =========================================================================
-    // 2. Safe User Profiles (`users/{userId}`)
+    // 2. User Profiles (`users/{userId}`) - Allows user onboarding & admin registration
     // =========================================================================
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && request.resource.data.uid == resource.data.uid;
+      allow read, write: if isAuthenticated();
     }
 
     // =========================================================================
-    // 3. Claimed Seats (1-Person-Per-Seat Exclusivity)
+    // 3. Claimed Seats (1-Person-Per-Seat Exclusivity & Admin Pre-assignment)
     // =========================================================================
     match /claimed_seats/{seatKey} {
-      allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated();
-      allow delete: if false;
+      allow read, write: if isAuthenticated();
     }
 
     // =========================================================================
@@ -45,9 +36,13 @@ service cloud.firestore {
     }
 
     // =========================================================================
-    // 5. General Speakers List (GSL) (`committee_speakers/{speakerId}`)
+    // 5. General Speakers List (GSL) & Real-Time Hand Raises
     // =========================================================================
     match /committee_speakers/{speakerId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /committee_hands/{handId} {
       allow read, write: if isAuthenticated();
     }
 
@@ -59,11 +54,10 @@ service cloud.firestore {
     }
 
     // =========================================================================
-    // 7. Voting Sessions & P5 Resolutions Engine (`voting_sessions/{sessionId}`)
+    // 7. Voting Sessions & Resolution Engine (`voting_sessions/{sessionId}`)
     // =========================================================================
     match /voting_sessions/{sessionId} {
-      allow read, create, update: if isAuthenticated();
-      allow delete: if false;
+      allow read, write: if isAuthenticated();
     }
 
     // Generic Committee / Motion / Vote fallbacks
@@ -80,7 +74,7 @@ service cloud.firestore {
     }
 
     // =========================================================================
-    // 8. Conference Photo Gallery & Selfie Pairing Invites
+    // 8. Conference Photo Gallery & Pairing Invites
     // =========================================================================
     match /gallery_items/{docId} {
       allow read, create: if true;

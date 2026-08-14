@@ -149,3 +149,59 @@ export async function saveUserProfile(
     { merge: true }
   );
 }
+
+/**
+ * Admin utility to manually register a participant and claim their seat.
+ */
+export async function adminRegisterParticipant(data: {
+  name: string;
+  email: string;
+  role: UserRole;
+  committee: string;
+  country: string;
+}): Promise<string> {
+  const isOrganiser = isOrganiserRole(data.role);
+  const syntheticUid = `manual_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const seatKey = isOrganiser
+    ? `event_organiser__${syntheticUid}`
+    : getSeatKey(data.role, data.committee, data.country, data.name);
+
+  // 1. Claim seat in Firestore
+  await setDoc(
+    doc(db, 'claimed_seats', seatKey),
+    {
+      seatKey,
+      uid: syntheticUid,
+      email: data.email,
+      name: data.name,
+      role: data.role,
+      committee: data.committee,
+      country: data.country,
+      claimedAt: Date.now(),
+      registeredByAdmin: true,
+    },
+    { merge: true }
+  );
+
+  // 2. Pre-create user profile in Firestore
+  await setDoc(
+    doc(db, 'users', syntheticUid),
+    {
+      uid: syntheticUid,
+      name: data.name,
+      displayName: data.name,
+      email: data.email,
+      role: data.role,
+      committee: data.committee,
+      country: data.country,
+      isP5: isP5Country(data.country),
+      isOnboarded: true,
+      registeredByAdmin: true,
+      createdAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  return syntheticUid;
+}
+

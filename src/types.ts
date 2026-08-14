@@ -76,6 +76,19 @@ export interface MUNState {
 }
 
 // ---------------------------------------------------------------------------
+// Hand Raises
+// ---------------------------------------------------------------------------
+
+export interface RaisedHandItem {
+  id: string;
+  uid: string;
+  name: string;
+  country: string;
+  committee: string;
+  timestamp: number;
+}
+
+// ---------------------------------------------------------------------------
 // General Speakers List (GSL)
 // ---------------------------------------------------------------------------
 
@@ -87,6 +100,9 @@ export interface SpeakerQueueItem {
   committee: string;
   timestamp: number;
   status: 'waiting' | 'speaking' | 'completed';
+  yieldType?: 'Chair' | 'Delegate' | 'Questions' | null;
+  yieldTarget?: string;
+  order?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +131,7 @@ export interface CommitteeMotion {
   topic: string;
   totalTime: number; // in seconds
   speakingTime: number; // in seconds
-  type: 'Moderated Caucus' | 'Unmoderated Caucus' | 'Closure of Debate' | 'Adjournment' | 'Other';
+  type: 'Moderated Caucus' | 'Unmoderated Caucus' | 'Closure of Debate' | 'Adjournment' | 'Consultation of the Whole' | 'Formal Debate' | 'Other';
   status: 'pending' | 'active' | 'passed' | 'failed';
   createdAt: number;
 }
@@ -139,8 +155,10 @@ export interface VoteResult {
 
 export interface VotingSession {
   id: string;
+  committeeId?: string;
   title: string;
   description: string;
+  votingType?: 'Procedural' | 'Substantive';
   isSubstantive: boolean;
   createdBy: string;            // uid of the Chair
   createdByName: string;

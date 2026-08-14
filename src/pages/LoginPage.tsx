@@ -86,7 +86,15 @@ export const LoginPage: React.FC = () => {
       await sendPasswordReset(resetEmail.trim());
       setResetSuccess(`Password reset email sent to ${resetEmail.trim()}. Please check your inbox and spam folder.`);
     } catch (err: any) {
-      setResetError(err?.message || 'Failed to send password reset email. Please verify the address.');
+      if (err.code === 'auth/user-not-found') {
+        setResetError('No account found with this email address.');
+      } else if (err.code === 'auth/invalid-email') {
+        setResetError('Please enter a valid email address.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setResetError('Too many password reset requests. Please wait a moment and try again.');
+      } else {
+        setResetError(err?.message || 'Failed to send password reset email. Please verify the address.');
+      }
     } finally {
       setResetLoading(false);
     }
