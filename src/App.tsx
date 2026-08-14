@@ -22,7 +22,15 @@ function AppInner() {
   const { user, loading: authLoading } = useAuth();
 
   const getInitialTab = (): TabId => {
-    const path = window.location.pathname.replace(/^\//, '');
+    // 1. Check hash first (#/about, #/mun, #/gallery, #/)
+    const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0].split('/')[0];
+    if (hash === 'about') return 'about';
+    if (hash === 'gallery') return 'gallery';
+    if (hash === 'mun') return 'mun';
+    if (hash === 'home') return 'home';
+
+    // 2. Fallback to pathname for backwards compatibility
+    const path = window.location.pathname.replace(/^\//, '').split('?')[0].split('/')[0];
     if (path === 'about') return 'about';
     if (path === 'gallery') return 'gallery';
     if (path === 'mun') return 'mun';
@@ -34,13 +42,17 @@ function AppInner() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileChecked, setProfileChecked] = useState(false);
 
-  // Sync tab with browser back/forward buttons
+  // Sync tab with browser hash and back/forward buttons
   useEffect(() => {
-    const handlePopState = () => {
+    const handleLocationChange = () => {
       setActiveTab(getInitialTab());
     };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handleLocationChange);
+    window.addEventListener('popstate', handleLocationChange);
+    return () => {
+      window.removeEventListener('hashchange', handleLocationChange);
+      window.removeEventListener('popstate', handleLocationChange);
+    };
   }, []);
 
   // Fetch user profile from Firestore whenever user changes
@@ -90,7 +102,7 @@ function AppInner() {
         <AboutPage
           onBack={() => {
             setActiveTab('home');
-            window.history.pushState({}, '', '/');
+            window.location.hash = '#/';
           }}
         />
       );
@@ -136,7 +148,7 @@ function AppInner() {
           <AboutPage
             onBack={() => {
               setActiveTab('home');
-              window.history.pushState({}, '', '/');
+              window.location.hash = '#/';
             }}
           />
         )}

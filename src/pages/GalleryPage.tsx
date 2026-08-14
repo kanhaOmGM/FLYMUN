@@ -50,7 +50,14 @@ export const GalleryPage: React.FC = () => {
   // ── Resolve invite from URL query-param (Firestore-backed) ─────────────
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const inviteId = params.get('invite');
+    let inviteId = params.get('invite');
+
+    if (!inviteId && window.location.hash.includes('?')) {
+      const hashQuery = window.location.hash.split('?')[1];
+      const hashParams = new URLSearchParams(hashQuery);
+      inviteId = hashParams.get('invite');
+    }
+
     if (inviteId) {
       getInvite(inviteId).then((invite) => {
         if (invite) {
@@ -180,7 +187,7 @@ export const GalleryPage: React.FC = () => {
         photoUrl: downloadUrl,
       });
 
-      const url = `${window.location.origin}${window.location.pathname}?invite=${inviteId}`;
+      const url = `${window.location.origin}/#/gallery?invite=${inviteId}`;
       setInviteLink(url);
       setName('');
       setMessage('');

@@ -35,7 +35,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const cleanEmail = String(email).toLowerCase().trim();
-    const targetUrl = portalUrl || process.env.VITE_PORTAL_URL || 'https://flymun.vercel.app';
+    const rawPortalUrl = portalUrl || process.env.VITE_PORTAL_URL || 'https://flymun.vercel.app';
+    const targetUrl = rawPortalUrl.includes('#') ? rawPortalUrl : `${rawPortalUrl.replace(/\/$/, '')}/#/mun`;
     const apiKey = (process.env.RESEND_API_KEY || '').trim();
 
     const emailSubject = `Conference Reminder & Official Credentials: ${name} (${role})`;

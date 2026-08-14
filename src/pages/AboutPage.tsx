@@ -18,8 +18,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onBack }) => {
     if (onBack) {
       onBack();
     } else {
-      window.history.pushState({}, '', '/');
-      window.location.href = '/';
+      window.location.hash = '#/';
     }
   };
 

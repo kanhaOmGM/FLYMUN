@@ -38,9 +38,9 @@ export const TopNav: React.FC<TopNavProps> = ({ activeTab, setActiveTab, profile
 
   const handleTabClick = (id: TabId) => {
     setActiveTab(id);
-    const newPath = id === 'home' ? '/' : `/${id}`;
-    if (window.location.pathname !== newPath) {
-      window.history.pushState({}, '', newPath);
+    const newHash = id === 'home' ? '#/' : `#/${id}`;
+    if (window.location.hash !== newHash) {
+      window.location.hash = newHash;
     }
   };
 

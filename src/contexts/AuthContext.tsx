@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
-  User,https://github.com/kanhaOmGM/FLYMUN/blob/main/src/contexts/AuthContext.tsx
+  User,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -33,12 +33,12 @@ const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
   error: null,
-  signIn: async () => {},
-  signUp: async () => {},
-  signInWithGoogle: async () => {},
-  sendPasswordReset: async () => {},
-  signOut: async () => {},
-  clearError: () => {},
+  signIn: async () => { },
+  signUp: async () => { },
+  signInWithGoogle: async () => { },
+  sendPasswordReset: async () => { },
+  signOut: async () => { },
+  clearError: () => { },
 });
 
 export const useAuth = () => useContext(AuthContext);
