@@ -2,83 +2,116 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function
+    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
 
     // =========================================================================
     // 1. System Configuration & Global Lock Switch (`systemConfig/munState`)
+    // Public read so landing page visitors can check conference state
     // =========================================================================
     match /systemConfig/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // =========================================================================
-    // 2. User Profiles (`users/{userId}`) - Allows user onboarding & admin registration
+    // 2. User Profiles (`users/{userId}`)
+    // Onboarding, profile management, and live seating participant cards
     // =========================================================================
     match /users/{userId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // =========================================================================
-    // 3. Claimed Seats (1-Person-Per-Seat Exclusivity & Admin Pre-assignment)
+    // 3. Claimed Seats (1-Person-Per-Seat Exclusivity & Real-time Seating Charts)
+    // Public read so the homepage seating chart displays live occupied seats
     // =========================================================================
     match /claimed_seats/{seatKey} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // =========================================================================
     // 4. Real-Time Committee Debate Timers (`committee_timers/{committeeId}`)
+    // Real-time synchronization for debate clocks across all devices
     // =========================================================================
     match /committee_timers/{committeeId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // =========================================================================
     // 5. General Speakers List (GSL) & Real-Time Hand Raises
     // =========================================================================
     match /committee_speakers/{speakerId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     match /committee_hands/{handId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // =========================================================================
     // 6. Committee Motions & Caucuses (`committee_motions/{motionId}`)
     // =========================================================================
     match /committee_motions/{motionId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // =========================================================================
     // 7. Voting Sessions & Resolution Engine (`voting_sessions/{sessionId}`)
     // =========================================================================
     match /voting_sessions/{sessionId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // Generic Committee / Motion / Vote fallbacks
     match /committees/{committeeId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     match /motions/{motionId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     match /votes/{voteId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // =========================================================================
-    // 8. Conference Photo Gallery & Pairing Invites
+    // 8. Banned Emails & Access Blacklist (`banned_emails/{emailKey}`)
+    // Public read so authentication listeners & login links can check ban status
+    // =========================================================================
+    match /banned_emails/{emailKey} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // =========================================================================
+    // 9. Custom Registered Participants (`custom_participants/{partId}`)
+    // Public read so homepage seating chart displays custom members in real time
+    // =========================================================================
+    match /custom_participants/{partId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // =========================================================================
+    // 10. Conference Photo Gallery & Pairing Invites
     // =========================================================================
     match /gallery_items/{docId} {
       allow read, create: if true;
-      allow update, delete: if false;
+      allow update, delete: if isAuthenticated();
     }
 
     match /gallery_invites/{inviteId} {
@@ -87,35 +120,22 @@ service cloud.firestore {
     }
 
     match /gallery/{imageId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // =========================================================================
-    // 9. Contact Support & Feedback Submissions
+    // 11. Contact Support & Feedback Submissions
     // =========================================================================
     match /feedback/{doc} {
-      allow create: if isAuthenticated()
-                    && request.resource.data.message is string
+      allow create: if request.resource.data.message is string
                     && request.resource.data.message.size() > 0
                     && request.resource.data.message.size() < 4001;
-      allow read, update, delete: if false;
+      allow read, update, delete: if isAuthenticated();
     }
 
     // =========================================================================
-    // 10. Banned Emails & Custom Participants (Admin Management)
-    // =========================================================================
-    match /banned_emails/{emailKey} {
-      allow read: if true;
-      allow write: if isAuthenticated();
-    }
-
-    match /custom_participants/{partId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
-    }
-
-    // =========================================================================
-    // 11. Default Deny for all other collections
+    // 12. Default Deny for any unmapped collections
     // =========================================================================
     match /{document=**} {
       allow read, write: if false;
