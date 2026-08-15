@@ -347,7 +347,7 @@ export const LoginPage: React.FC = () => {
                 >
                   Password
                 </label>
-                {!isRegister && (
+                {/* {!isRegister && (
                   <button
                     type="button"
                     onClick={() => {
@@ -363,7 +363,7 @@ export const LoginPage: React.FC = () => {
                     <Link2 className="h-3 w-3" />
                     <span>Login with Link</span>
                   </button>
-                )}
+                )} */}
               </div>
               <div className="relative">
                 <Lock
@@ -469,8 +469,8 @@ export const LoginPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Login with Link / Instant Access Modal ────────────────────────── */}
-      {showLoginLinkModal && (
+      {/* ── Login with Link / Instant Access Modal (Commented out) ────────────────────────── */}
+      {/* {showLoginLinkModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)' }}
@@ -516,7 +516,6 @@ export const LoginPage: React.FC = () => {
               </div>
             )}
 
-            {/* Generated Direct Login Link Box */}
             {generatedLoginLink && (
               <div
                 className="p-4 rounded-2xl border space-y-3 shadow-sm animate-in fade-in zoom-in-95"
@@ -624,7 +623,7 @@ export const LoginPage: React.FC = () => {
             </form>
           </div>
         </div>
-      )}
+      )} */}
 
     </div>
   );
