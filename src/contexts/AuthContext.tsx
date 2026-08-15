@@ -4,8 +4,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   updateProfile,
@@ -14,7 +13,7 @@ import {
 import { auth } from '../firebase';
 
 // ---------------------------------------------------------------------------
-// AuthContext – email/password + Google Sign-In with Redirect + Password Reset
+// AuthContext – email/password + Google Sign-In with Popup + Password Reset
 // ---------------------------------------------------------------------------
 
 interface AuthContextValue {
@@ -54,19 +53,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for redirect result on app initialization
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result?.user) {
-          setUser(result.user);
-        }
-      })
-      .catch((err) => {
-        if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
-          setError(mapFirebaseError(err.code));
-        }
-      });
-
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
@@ -96,13 +82,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Direct Sign In with Redirect (eliminates popup blocker and COOP errors)
+  // Google Sign In with Popup
   const signInWithGoogle = async () => {
     try {
       setError(null);
-      await signInWithRedirect(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      if (result?.user) {
+        setUser(result.user);
+      }
     } catch (err: any) {
-      setError(mapFirebaseError(err.code));
+      if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+        setError(mapFirebaseError(err.code));
+      }
     }
   };
 
@@ -142,7 +133,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 function mapFirebaseError(code: string): string {
   switch (code) {
     case 'auth/unauthorized-domain':
-      return 'This domain is not authorized in Firebase. Add this domain to Firebase Console > Authentication > Settings > Authorized Domains.';
+      return 'This domain is not authorized in Firebase. Add your Vercel deployment domain to Firebase Console > Authentication > Settings > Authorized Domains.';
+    case 'auth/popup-blocked':
+      return 'The sign-in popup was blocked by your browser. Please allow popups for this site and try again.';
     case 'auth/user-not-found':
     case 'auth/wrong-password':
     case 'auth/invalid-credential':
