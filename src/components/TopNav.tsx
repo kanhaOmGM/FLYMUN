@@ -258,7 +258,7 @@ export const TopNav: React.FC<TopNavProps> = ({ activeTab, setActiveTab, profile
                     Interactive MUN Platform Support
                   </h4>
                   <p className="text-[11px] font-medium" style={{ color: dark ? '#a1a1aa' : '#64748b' }}>
-                    Having trouble claiming your seat or resetting your password? Use the "Forgot Password" tool or contact the Event Organiser.
+                    Having trouble claiming your seat or accessing your account? Use the "Login with Link" tool on the sign-in page or contact the Event Organiser.
                   </p>
                 </div>
               </div>

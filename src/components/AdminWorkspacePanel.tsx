@@ -19,6 +19,10 @@ import {
   UserCheck,
   UserPlus,
   ShieldAlert,
+  Copy,
+  Check,
+  ExternalLink,
+  Link2,
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import type { UserProfile, UserRole, MUNState, CommitteeTimerState, CommitteeMotion } from '../types';
@@ -830,6 +834,25 @@ const AddParticipantSection: React.FC<{
   const [country, setCountry] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [generatedLoginLink, setGeneratedLoginLink] = useState<{
+    name: string;
+    email: string;
+    role: string;
+    committee: string;
+    link: string;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyLink = async () => {
+    if (!generatedLoginLink?.link) return;
+    try {
+      await navigator.clipboard.writeText(generatedLoginLink.link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // Fallback
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -837,51 +860,41 @@ const AddParticipantSection: React.FC<{
 
     setSubmitting(true);
     setStatusMessage(null);
+    setCopied(false);
 
     try {
-      // 1. Write participant to Firestore custom_participants and claimed_seats
+      const cleanEmail = email.trim().toLowerCase();
+      const representation = country.trim() || (role === 'Chair' ? 'Unassigned' : 'General Representation');
+
+      // 1. Write participant directly to Firestore custom_participants, claimed_seats, and users
+      // (No email sent, no email verification needed)
       await adminAddCustomParticipant({
         name: name.trim(),
-        email: email.trim().toLowerCase(),
+        email: cleanEmail,
         role,
         committee,
-        country: country.trim() || (role === 'Chair' ? 'Unassigned' : 'General Representation'),
+        country: representation,
       });
 
-      // 2. Dispatch official invite email via Resend API
-      let data: any = { success: true };
-      try {
-        const res = await fetch('/api/send-invite', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: email.trim().toLowerCase(),
-            name: name.trim(),
-            role,
-            committee,
-            country: country.trim() || 'General Representation',
-            portalUrl: window.location.origin,
-          }),
-        });
+      // 2. Generate direct login link for this person
+      const directLoginUrl = `${window.location.origin}/#/login?email=${encodeURIComponent(cleanEmail)}`;
+      setGeneratedLoginLink({
+        name: name.trim(),
+        email: cleanEmail,
+        role,
+        committee,
+        link: directLoginUrl,
+      });
 
-        const text = await res.text();
-        data = text ? JSON.parse(text) : {};
-
-        if (!res.ok) {
-          throw new Error(data.error || `HTTP ${res.status}`);
-        }
-      } catch (emailErr: any) {
-        console.warn('Email dispatch warning (local/simulated):', emailErr);
-        data = { success: true, simulated: true, note: emailErr?.message };
-      }
-
-      const log = `[${new Date().toLocaleTimeString()}] Registered & dispatched invite to ${name} (${email}) - ID: ${data.id || 'simulated'}`;
+      const log = `[${new Date().toLocaleTimeString()}] ADDED (Testing Mode - No Email Sent): ${name.trim()} (${cleanEmail}) as ${role} of ${committee}. Direct Login Link: ${directLoginUrl}`;
       onParticipantAdded(log);
+
       setStatusMessage({
         type: 'success',
-        text: `Participant ${name} successfully registered in Firestore! Invitation processed for ${email}.`,
+        text: `Participant "${name.trim()}" added to database and live roster! No email was sent (Testing Mode). Direct login link generated below.`,
       });
-      // Reset form
+
+      // Reset form fields
       setName('');
       setEmail('');
       setCountry('');
@@ -889,7 +902,7 @@ const AddParticipantSection: React.FC<{
       console.error('Add participant error:', err);
       setStatusMessage({
         type: 'error',
-        text: `Error registering participant: ${err?.message || 'Check database permissions'}`,
+        text: `Error adding participant: ${err?.message || 'Check database permissions'}`,
       });
     } finally {
       setSubmitting(false);
@@ -902,11 +915,14 @@ const AddParticipantSection: React.FC<{
       style={{ background: panelBg, borderColor: panelBorder }}
     >
       <div>
-        <h3 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight" style={{ color: headingColor }}>
-          Add Participant &amp; Dispatch Live Test Invite
-        </h3>
-        <p className="text-xs sm:text-sm font-medium mt-1" style={{ color: mutedText }}>
-          Manually register a new delegate, chair, or observer, assign their seat in Firestore, and trigger an automated invitation email via Resend.
+        <div className="flex items-center gap-2 mb-1">
+          <UserPlus className="h-5 w-5" style={{ color: dark ? '#ffffff' : '#172554' }} />
+          <h3 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight" style={{ color: headingColor }}>
+            Add Participant &amp; Generate Instant Login Link
+          </h3>
+        </div>
+        <p className="text-xs sm:text-sm font-medium" style={{ color: mutedText }}>
+          Directly register a new delegate, chair, or observer into the database and live seating chart. <strong>No email is sent and no email verification is required.</strong> The participant can log in immediately using their direct login link.
         </p>
       </div>
 
@@ -920,6 +936,71 @@ const AddParticipantSection: React.FC<{
         >
           {statusMessage.type === 'success' ? '✓ ' : '⚠ '}
           {statusMessage.text}
+        </div>
+      )}
+
+      {/* Direct Login Link Display Box */}
+      {generatedLoginLink && (
+        <div
+          className="p-5 rounded-2xl border space-y-3 animate-in fade-in zoom-in-95 shadow-sm"
+          style={{
+            background: dark ? '#18181b' : '#faf8f5',
+            borderColor: dark ? '#3f3f46' : '#cbd5e1',
+          }}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-emerald-400" />
+              <span className="text-xs font-bold font-mono uppercase tracking-wider" style={{ color: headingColor }}>
+                Direct Login Link for: <span className="text-emerald-400">{generatedLoginLink.name}</span> ({generatedLoginLink.role})
+              </span>
+            </div>
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-800">
+              Ready to Share &amp; Test
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              value={generatedLoginLink.link}
+              className="flex-1 px-3.5 py-2.5 rounded-xl font-mono text-xs border bg-black/40 text-slate-200 select-all focus:outline-none"
+              style={{ borderColor: dark ? '#3f3f46' : '#cbd5e1' }}
+            />
+
+            <button
+              onClick={handleCopyLink}
+              className="px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-sm"
+              style={{
+                background: copied ? '#10b981' : (dark ? '#27272a' : '#fef08a'),
+                color: copied ? '#ffffff' : (dark ? '#ffffff' : '#172554'),
+                border: copied ? '1px solid #059669' : (dark ? '1px solid #3f3f46' : '1px solid #fde047'),
+              }}
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              <span>{copied ? 'Copied ✓' : 'Copy Login Link'}</span>
+            </button>
+
+            <a
+              href={generatedLoginLink.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-2.5 rounded-xl font-bold text-xs border flex items-center justify-center gap-1.5 transition hover:opacity-80"
+              style={{
+                background: dark ? '#000000' : '#ffffff',
+                borderColor: dark ? '#3f3f46' : '#cbd5e1',
+                color: headingColor,
+              }}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              <span>Open Link</span>
+            </a>
+          </div>
+
+          <p className="text-[11px] font-medium" style={{ color: mutedText }}>
+            Tip: The person can open this link to sign in with Google or password immediately. No email verification or activation step is required.
+          </p>
         </div>
       )}
 
@@ -1039,11 +1120,11 @@ const AddParticipantSection: React.FC<{
         >
           {submitting ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Registering &amp; Dispatching…
+              <Loader2 className="h-4 w-4 animate-spin" /> Adding to Database…
             </>
           ) : (
             <>
-              <Send className="h-4 w-4" /> Save Participant &amp; Dispatch Invite Email
+              <UserPlus className="h-4 w-4" /> Add Participant &amp; Generate Login Link
             </>
           )}
         </button>

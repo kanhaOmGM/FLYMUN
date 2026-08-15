@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ShieldCheck,
   ImageIcon,
@@ -16,12 +16,16 @@ import {
   X,
   Loader2,
   Globe2,
+  Link2,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { isEmailBanned } from '../services/userService';
 
 export const LoginPage: React.FC = () => {
-  const { signIn, signUp, signInWithGoogle, sendPasswordReset, error, clearError } = useAuth();
+  const { signIn, signUp, signInWithGoogle, error, clearError } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const dark = theme === 'dark';
 
@@ -31,15 +35,41 @@ export const LoginPage: React.FC = () => {
   const [displayName, setDisplayName] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Forgot password modal state
-  const [showForgotModal, setShowForgotModal] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
-  const [resetLoading, setResetLoading] = useState(false);
-  const [resetSuccess, setResetSuccess] = useState<string | null>(null);
-  const [resetError, setResetError] = useState<string | null>(null);
+  // Login with Link modal state (replaces Reset Password)
+  const [showLoginLinkModal, setShowLoginLinkModal] = useState(false);
+  const [linkEmail, setLinkEmail] = useState('');
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [generatedLoginLink, setGeneratedLoginLink] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   const authFormRef = useRef<HTMLDivElement | null>(null);
   const emailInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Check URL query parameters for pre-filling email (from direct login link)
+  useEffect(() => {
+    const hash = window.location.hash || '';
+    const qIndex = hash.indexOf('?');
+    let emailParam = '';
+    if (qIndex !== -1) {
+      const sp = new URLSearchParams(hash.substring(qIndex));
+      emailParam = sp.get('email') || '';
+    }
+    if (!emailParam) {
+      const sp = new URLSearchParams(window.location.search);
+      emailParam = sp.get('email') || '';
+    }
+
+    if (emailParam) {
+      setEmail(emailParam);
+      setIsRegister(false);
+      setTimeout(() => {
+        if (authFormRef.current) {
+          authFormRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+    }
+  }, []);
 
   const handleStartHere = () => {
     clearError();
@@ -76,28 +106,50 @@ export const LoginPage: React.FC = () => {
     setSubmitting(false);
   };
 
-  const handleSendResetEmail = async (e: React.FormEvent) => {
+  const handleGenerateLoginLink = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetEmail.trim()) return;
-    setResetLoading(true);
-    setResetError(null);
-    setResetSuccess(null);
+    if (!linkEmail.trim()) return;
+
+    setLinkLoading(true);
+    setLinkError(null);
+    setGeneratedLoginLink(null);
+    setLinkCopied(false);
+
     try {
-      await sendPasswordReset(resetEmail.trim());
-      setResetSuccess(`Password reset email sent to ${resetEmail.trim()}. Please check your inbox and spam folder.`);
-    } catch (err: any) {
-      if (err.code === 'auth/user-not-found') {
-        setResetError('No account found with this email address.');
-      } else if (err.code === 'auth/invalid-email') {
-        setResetError('Please enter a valid email address.');
-      } else if (err.code === 'auth/too-many-requests') {
-        setResetError('Too many password reset requests. Please wait a moment and try again.');
-      } else {
-        setResetError(err?.message || 'Failed to send password reset email. Please verify the address.');
+      const clean = linkEmail.trim().toLowerCase();
+      const banned = await isEmailBanned(clean);
+      if (banned) {
+        setLinkError(`Your account (${clean}) has been permanently banned from FLYIMUN 2026.`);
+        setLinkLoading(false);
+        return;
       }
+
+      const directUrl = `${window.location.origin}/#/login?email=${encodeURIComponent(clean)}`;
+      setGeneratedLoginLink(directUrl);
+    } catch (err: any) {
+      setLinkError(err?.message || 'Failed to generate login link.');
     } finally {
-      setResetLoading(false);
+      setLinkLoading(false);
     }
+  };
+
+  const handleCopyGeneratedLink = async () => {
+    if (!generatedLoginLink) return;
+    try {
+      await navigator.clipboard.writeText(generatedLoginLink);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
+    } catch {
+      // Fallback
+    }
+  };
+
+  const handleApplyLinkEmail = () => {
+    if (linkEmail) {
+      setEmail(linkEmail.trim().toLowerCase());
+    }
+    setShowLoginLinkModal(false);
+    setTimeout(() => emailInputRef.current?.focus(), 150);
   };
 
   // Instagram-style two sections: Left Black Background, Right Grey Background
@@ -299,15 +351,17 @@ export const LoginPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      setResetEmail(email);
-                      setResetSuccess(null);
-                      setResetError(null);
-                      setShowForgotModal(true);
+                      setLinkEmail(email);
+                      setGeneratedLoginLink(null);
+                      setLinkError(null);
+                      setLinkCopied(false);
+                      setShowLoginLinkModal(true);
                     }}
-                    className="text-[11px] font-bold transition hover:underline"
+                    className="text-[11px] font-bold transition hover:underline flex items-center gap-1"
                     style={{ color: dark ? '#cbd5e1' : '#172554' }}
                   >
-                    Forgot Password?
+                    <Link2 className="h-3 w-3" />
+                    <span>Login with Link</span>
                   </button>
                 )}
               </div>
@@ -415,28 +469,28 @@ export const LoginPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Forgot Password Modal ────────────────────────────────────────── */}
-      {showForgotModal && (
+      {/* ── Login with Link / Instant Access Modal ────────────────────────── */}
+      {showLoginLinkModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)' }}
         >
           <div
-            className="w-full max-w-md rounded-3xl border p-6 sm:p-8 shadow-2xl transition-colors duration-300"
+            className="w-full max-w-md rounded-3xl border p-6 sm:p-8 shadow-2xl transition-colors duration-300 space-y-4"
             style={{
               background: rightCardBg,
               borderColor: rightBorder,
             }}
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <HelpCircle className="h-6 w-6" style={{ color: dark ? '#ffffff' : '#172554' }} />
+                <Link2 className="h-6 w-6 text-emerald-400" />
                 <h3 className="text-xl font-extrabold" style={{ color: dark ? '#ffffff' : '#172554' }}>
-                  Reset Your Password
+                  Login with this Link
                 </h3>
               </div>
               <button
-                onClick={() => setShowForgotModal(false)}
+                onClick={() => setShowLoginLinkModal(false)}
                 className="p-1 rounded-lg hover:opacity-75 transition"
                 style={{ color: dark ? '#94a3b8' : '#475569' }}
               >
@@ -444,53 +498,95 @@ export const LoginPage: React.FC = () => {
               </button>
             </div>
 
-            <p className="text-xs sm:text-sm mb-4 font-medium" style={{ color: dark ? '#94a3b8' : '#64748b' }}>
-              Enter your registered email address below. We'll send you an official password reset link.
+            <p className="text-xs sm:text-sm font-medium" style={{ color: dark ? '#94a3b8' : '#64748b' }}>
+              Enter your registered email address below to generate your direct login link. No password or email verification is required.
             </p>
 
-            {resetSuccess && (
+            {linkError && (
               <div
-                className="p-3.5 rounded-xl mb-4 text-xs font-bold flex items-start gap-2"
+                className="p-3.5 rounded-xl text-xs font-bold flex items-start gap-2"
                 style={{
-                  background: dark ? '#0e1a38' : '#ecfdf5',
-                  color: dark ? '#ffffff' : '#065f46',
-                  border: `1px solid ${dark ? '#475569' : '#a7f3d0'}`,
-                }}
-              >
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                <span>{resetSuccess}</span>
-              </div>
-            )}
-
-            {resetError && (
-              <div
-                className="p-3.5 rounded-xl mb-4 text-xs font-bold flex items-start gap-2"
-                style={{
-                  background: dark ? '#0e1a38' : '#fef2f2',
+                  background: dark ? '#18181b' : '#fef2f2',
                   color: dark ? '#ffffff' : '#dc2626',
-                  border: `1px solid ${dark ? '#475569' : '#fecaca'}`,
+                  border: `1px solid ${dark ? '#3f3f46' : '#fecaca'}`,
                 }}
               >
                 <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
-                <span>{resetError}</span>
+                <span>{linkError}</span>
               </div>
             )}
 
-            <form onSubmit={handleSendResetEmail} className="space-y-4">
+            {/* Generated Direct Login Link Box */}
+            {generatedLoginLink && (
+              <div
+                className="p-4 rounded-2xl border space-y-3 shadow-sm animate-in fade-in zoom-in-95"
+                style={{
+                  background: dark ? '#18181b' : '#faf8f5',
+                  borderColor: dark ? '#3f3f46' : '#cbd5e1',
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold font-mono text-emerald-400 uppercase tracking-wider">
+                    ✓ Direct Login Link Ready:
+                  </span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-800">
+                    Active
+                  </span>
+                </div>
+
+                <input
+                  type="text"
+                  readOnly
+                  value={generatedLoginLink}
+                  className="w-full px-3 py-2 rounded-xl font-mono text-xs border bg-black/40 text-slate-200 select-all focus:outline-none"
+                  style={{ borderColor: dark ? '#3f3f46' : '#cbd5e1' }}
+                />
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCopyGeneratedLink}
+                    className="flex-1 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-sm"
+                    style={{
+                      background: linkCopied ? '#10b981' : (dark ? '#27272a' : '#fef08a'),
+                      color: linkCopied ? '#ffffff' : (dark ? '#ffffff' : '#172554'),
+                      border: linkCopied ? '1px solid #059669' : (dark ? '1px solid #3f3f46' : '1px solid #fde047'),
+                    }}
+                  >
+                    {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    <span>{linkCopied ? 'Copied ✓' : 'Copy Login Link'}</span>
+                  </button>
+
+                  <button
+                    onClick={handleApplyLinkEmail}
+                    className="flex-1 py-2.5 rounded-xl font-bold text-xs border flex items-center justify-center gap-1.5 transition"
+                    style={{
+                      background: dark ? '#000000' : '#ffffff',
+                      borderColor: dark ? '#3f3f46' : '#cbd5e1',
+                      color: dark ? '#ffffff' : '#172554',
+                    }}
+                  >
+                    <Rocket className="h-3.5 w-3.5" />
+                    <span>Use &amp; Sign In</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleGenerateLoginLink} className="space-y-4">
               <div>
                 <label
                   className="block text-xs font-bold mb-1.5"
                   style={{ color: dark ? '#cbd5e1' : '#172554' }}
                 >
-                  Account Email Address
+                  Registered Email Address
                 </label>
                 <input
                   type="email"
                   required
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
+                  value={linkEmail}
+                  onChange={(e) => setLinkEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="w-full px-4 py-2.5 rounded-xl text-sm transition focus:outline-none focus:ring-2 focus:ring-yellow-300 font-medium"
+                  className="w-full px-4 py-2.5 rounded-xl text-sm transition focus:outline-none focus:ring-2 focus:ring-slate-400 font-medium"
                   style={{
                     background: dark ? '#000000' : '#faf8f5',
                     border: `1px solid ${dark ? '#475569' : '#cbd5e1'}`,
@@ -502,7 +598,7 @@ export const LoginPage: React.FC = () => {
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowForgotModal(false)}
+                  onClick={() => setShowLoginLinkModal(false)}
                   className="flex-1 py-2.5 rounded-xl font-bold text-xs sm:text-sm border transition"
                   style={{
                     background: dark ? '#000000' : '#faf8f5',
@@ -510,11 +606,11 @@ export const LoginPage: React.FC = () => {
                     color: dark ? '#94a3b8' : '#475569',
                   }}
                 >
-                  Cancel
+                  Close
                 </button>
                 <button
                   type="submit"
-                  disabled={resetLoading}
+                  disabled={linkLoading || !linkEmail.trim()}
                   className="flex-1 py-2.5 rounded-xl font-extrabold text-xs sm:text-sm shadow-sm transition flex items-center justify-center gap-2"
                   style={{
                     background: dark ? '#172554' : '#fef08a',
@@ -522,7 +618,7 @@ export const LoginPage: React.FC = () => {
                     border: dark ? '1px solid #475569' : '1px solid #fde047',
                   }}
                 >
-                  {resetLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send Reset Link'}
+                  {linkLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Generate Login Link'}
                 </button>
               </div>
             </form>
