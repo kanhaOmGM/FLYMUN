@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Globe,
   Users,
@@ -14,8 +14,9 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { ROSTER_MASTER_DATA, COMMITTEES } from '../data/rosterData';
-import type { UserProfile } from '../types';
+import type { UserProfile, UserRole } from '../types';
 import { isOrganiserRole } from '../types';
+import { subscribeToCustomParticipants, subscribeToBannedEmails } from '../services/userService';
 
 // ---------------------------------------------------------------------------
 // Delegate & Committee Data derived from Master Roster
@@ -33,25 +34,6 @@ interface CommitteeConfig {
   delegates: DelegateSeat[];
 }
 
-const COMMITTEE_CARDS: CommitteeConfig[] = COMMITTEES.map((commName) => {
-  const delegates = ROSTER_MASTER_DATA
-    .filter((r) => r.committee === commName && r.role !== 'Observer')
-    .map((r) => ({
-      name: r.name,
-      country: r.country,
-      post: r.role,
-    }));
-
-  const isWHO = commName.includes('WHO');
-  const isIPC = commName.includes('IPC');
-
-  return {
-    id: isWHO ? 'who' : isIPC ? 'ipc' : 'icj',
-    name: commName,
-    delegates,
-  };
-});
-
 // ---------------------------------------------------------------------------
 // Seating Dot Component
 // ---------------------------------------------------------------------------
@@ -59,9 +41,10 @@ const COMMITTEE_CARDS: CommitteeConfig[] = COMMITTEES.map((commName) => {
 interface SeatProps {
   delegate: DelegateSeat;
   dark: boolean;
+  isChair?: boolean;
 }
 
-const Seat: React.FC<SeatProps> = ({ delegate, dark }) => {
+const Seat: React.FC<SeatProps> = ({ delegate, dark, isChair }) => {
   const [hovered, setHovered] = useState(false);
 
   const badgeColor = dark ? '#ffffff' : '#172554';
@@ -72,15 +55,23 @@ const Seat: React.FC<SeatProps> = ({ delegate, dark }) => {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Seat dot */}
+      {/* Seat dot (Chairs are 20% larger than delegates: w-6 h-6 vs w-5 h-5) */}
       <div
-        className="w-5 h-5 rounded-full flex-shrink-0 ring-2 ring-offset-1 transition-transform duration-200"
+        className={`${isChair ? 'w-6 h-6 ring-2' : 'w-5 h-5 ring-2'} rounded-full flex-shrink-0 ring-offset-1 transition-transform duration-200`}
         style={{
-          background: dark ? '#000000' : '#172554',
-          borderColor: dark ? '#71717a' : '#fde047',
-          outline: dark ? '2px solid #3f3f46' : '2px solid #fef08a',
-          transform: hovered ? 'scale(1.4)' : 'scale(1)',
-          boxShadow: hovered ? (dark ? '0 0 10px #ffffff66' : '0 0 10px #fde047cc') : 'none',
+          background: isChair
+            ? (dark ? '#27272a' : '#fef08a')
+            : (dark ? '#000000' : '#172554'),
+          borderColor: isChair
+            ? (dark ? '#ffffff' : '#eab308')
+            : (dark ? '#71717a' : '#fde047'),
+          outline: isChair
+            ? (dark ? '2px solid #ffffff' : '2px solid #ca8a04')
+            : (dark ? '2px solid #3f3f46' : '2px solid #fef08a'),
+          transform: hovered ? (isChair ? 'scale(1.3)' : 'scale(1.35)') : 'scale(1)',
+          boxShadow: hovered
+            ? (isChair ? (dark ? '0 0 14px #ffffffaa' : '0 0 14px #eab308aa') : (dark ? '0 0 10px #ffffff66' : '0 0 10px #fde047cc'))
+            : (isChair ? (dark ? '0 0 8px #ffffff33' : '0 0 8px #eab30844') : 'none'),
         }}
       />
 
@@ -101,21 +92,21 @@ const Seat: React.FC<SeatProps> = ({ delegate, dark }) => {
           <span
             className="inline-block mt-1.5 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider"
             style={{
-              background: dark ? '#27272a' : '#fef08a',
-              color: badgeColor,
-              border: dark ? '1px solid #3f3f46' : '1px solid #fde047',
+              background: isChair ? (dark ? '#3f3f46' : '#fef08a') : (dark ? '#27272a' : '#fef08a'),
+              color: isChair ? (dark ? '#ffffff' : '#854d0e') : badgeColor,
+              border: isChair ? (dark ? '1px solid #71717a' : '1px solid #eab308') : (dark ? '1px solid #3f3f46' : '1px solid #fde047'),
             }}
           >
-            {delegate.post}
+            {isChair ? 'Executive Board (Chair)' : delegate.post}
           </span>
         </div>
       )}
 
       {/* Name below dot */}
-      <div className="text-center" style={{ maxWidth: '80px' }}>
+      <div className="text-center" style={{ maxWidth: isChair ? '95px' : '80px' }}>
         <p
-          className="text-[10px] font-semibold leading-tight truncate font-sans"
-          style={{ color: dark ? '#ffffff' : '#172554' }}
+          className={`text-[10px] ${isChair ? 'font-black' : 'font-semibold'} leading-tight truncate font-sans`}
+          style={{ color: isChair ? (dark ? '#fde047' : '#1e3a8a') : (dark ? '#ffffff' : '#172554') }}
         >
           {delegate.name.split(' ')[0]}
         </p>
@@ -123,7 +114,7 @@ const Seat: React.FC<SeatProps> = ({ delegate, dark }) => {
           className="text-[9px] leading-tight truncate opacity-80 font-mono mt-0.5"
           style={{ color: dark ? '#a1a1aa' : '#475569' }}
         >
-          {delegate.country.startsWith('N/A') ? 'Chair' : delegate.country}
+          {delegate.country.startsWith('N/A') || isChair ? 'Chair' : delegate.country}
         </p>
       </div>
     </div>
@@ -141,12 +132,16 @@ const CommitteeSection: React.FC<{ committee: CommitteeConfig; dark: boolean; is
 }) => {
   const [expanded, setExpanded] = useState(true);
 
-  // Arrange delegates into rows
-  const rows = [
-    committee.delegates.slice(0, 4),
-    committee.delegates.slice(4, 10),
-    committee.delegates.slice(10, 18),
-    committee.delegates.slice(18),
+  // Strictly filter only Chairs and Delegates (No Observers, No Faculty Advisors)
+  const chairs = committee.delegates.filter((d) => d.post === 'Chair');
+  const delegates = committee.delegates.filter((d) => d.post === 'Delegate');
+
+  // Arrange delegates into subsequent rows below the Dais
+  const delegateRows = [
+    delegates.slice(0, 6),
+    delegates.slice(6, 14),
+    delegates.slice(14, 24),
+    delegates.slice(24),
   ].filter((r) => r.length > 0);
 
   const dividerColor = dark ? '#27272a' : '#e2e8f0';
@@ -177,7 +172,7 @@ const CommitteeSection: React.FC<{ committee: CommitteeConfig; dark: boolean; is
               border: dark ? '1px solid #3f3f46' : '1px solid #fde047',
             }}
           >
-            {committee.delegates.length} delegates
+            {chairs.length} Chairs · {delegates.length} Delegates
           </span>
         </div>
         <button
@@ -190,11 +185,11 @@ const CommitteeSection: React.FC<{ committee: CommitteeConfig; dark: boolean; is
       </div>
 
       {expanded && (
-        <>
-          {/* Podium / dais label */}
-          <div className="flex justify-center mb-6">
+        <div className="space-y-8">
+          {/* Row 1: Strictly Executive Board & Chairs (Dais) with 20% larger circles */}
+          <div className="flex flex-col items-center gap-4">
             <div
-              className="text-[10px] font-mono font-bold px-3.5 py-1 rounded-full tracking-widest uppercase"
+              className="text-[10px] font-mono font-bold px-3.5 py-1 rounded-full tracking-widest uppercase shadow-sm"
               style={{
                 background: dark ? '#18181b' : '#fef08a',
                 color: dark ? '#ffffff' : '#172554',
@@ -202,13 +197,29 @@ const CommitteeSection: React.FC<{ committee: CommitteeConfig; dark: boolean; is
                 letterSpacing: '0.18em',
               }}
             >
-              Executive Board & Dais
+              Row 1: Executive Board &amp; Dais
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-8 py-2">
+              {chairs.map((chair) => (
+                <Seat
+                  key={chair.name}
+                  delegate={chair}
+                  dark={dark}
+                  isChair={true}
+                />
+              ))}
             </div>
           </div>
 
-          {/* Seat rows (arc arrangement) */}
+          {/* Thin Dais divider */}
+          <div className="flex justify-center">
+            <div className="w-56 h-px" style={{ background: dividerColor }} />
+          </div>
+
+          {/* Subsequent Rows: Strictly Committee Delegates */}
           <div className="flex flex-col gap-6 items-center">
-            {rows.map((row, ri) => (
+            {delegateRows.map((row, ri) => (
               <div
                 key={ri}
                 className="flex flex-wrap justify-center gap-6"
@@ -222,34 +233,41 @@ const CommitteeSection: React.FC<{ committee: CommitteeConfig; dark: boolean; is
                     key={delegate.name}
                     delegate={delegate}
                     dark={dark}
+                    isChair={false}
                   />
                 ))}
               </div>
             ))}
           </div>
 
-          {/* Legend */}
-          <div className="mt-8 flex flex-wrap justify-center gap-4 pt-4">
-            {[
-              { label: 'Chair', color: dark ? '#ffffff' : '#172554' },
-              { label: 'Delegate', color: dark ? '#a1a1aa' : '#1e3a8a' },
-              { label: 'Faculty Advisor', color: dark ? '#d4d4d8' : '#334155' },
-              { label: 'Observer', color: dark ? '#71717a' : '#64748b' },
-            ].map(({ label, color }) => (
-              <div key={label} className="flex items-center gap-1.5 font-mono text-[11px]">
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ background: color }}
-                />
-                <span
-                  style={{ color: dark ? '#d4d4d8' : '#475569' }}
-                >
-                  {label}
-                </span>
-              </div>
-            ))}
+          {/* Clean Legend (No Observers, No Faculty Advisors) */}
+          <div className="mt-8 flex flex-wrap justify-center gap-6 pt-4 border-t" style={{ borderColor: dividerColor }}>
+            <div className="flex items-center gap-2 font-mono text-[11px]">
+              <span
+                className="w-3.5 h-3.5 rounded-full ring-2"
+                style={{
+                  background: dark ? '#27272a' : '#fef08a',
+                  borderColor: dark ? '#ffffff' : '#eab308',
+                }}
+              />
+              <span style={{ color: dark ? '#ffffff' : '#172554', fontWeight: 600 }}>
+                Chair (Row 1 Dais — 20% Larger)
+              </span>
+            </div>
+            <div className="flex items-center gap-2 font-mono text-[11px]">
+              <span
+                className="w-2.5 h-2.5 rounded-full ring-1"
+                style={{
+                  background: dark ? '#000000' : '#172554',
+                  borderColor: dark ? '#71717a' : '#fde047',
+                }}
+              />
+              <span style={{ color: dark ? '#d4d4d8' : '#475569' }}>
+                Delegate (General Committee Rows)
+              </span>
+            </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -308,6 +326,67 @@ export const HomePage: React.FC<HomePageProps> = ({ profile }) => {
   const mutedText = dark ? '#a1a1aa' : '#475569';
   const dividerBorder = dark ? '#27272a' : '#e2e8f0';
 
+  // ── Dynamic live state for custom participants and banned emails ────────
+  const [customParticipants, setCustomParticipants] = useState<Array<{ name: string; email: string; role: UserRole; committee: string; country: string }>>([]);
+  const [bannedEmails, setBannedEmails] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const unsubCustom = subscribeToCustomParticipants((list) => {
+      setCustomParticipants(list);
+    });
+    const unsubBanned = subscribeToBannedEmails((list) => {
+      setBannedEmails(new Set(list.map((b) => b.email.toLowerCase().trim())));
+    });
+    return () => {
+      unsubCustom();
+      unsubBanned();
+    };
+  }, []);
+
+  const committeeCards: CommitteeConfig[] = useMemo(() => {
+    const combined = [
+      ...ROSTER_MASTER_DATA.map((r) => ({
+        name: r.name,
+        email: r.email.toLowerCase().trim(),
+        role: r.role,
+        committee: r.committee,
+        country: r.country,
+      })),
+      ...customParticipants.map((c) => ({
+        name: c.name,
+        email: c.email.toLowerCase().trim(),
+        role: c.role,
+        committee: c.committee,
+        country: c.country,
+      })),
+    ];
+
+    return COMMITTEES.map((commName) => {
+      // Exclude Observers and Faculty Advisors, and exclude banned emails
+      const delegates = combined
+        .filter(
+          (r) =>
+            r.committee === commName &&
+            (r.role === 'Chair' || r.role === 'Delegate') &&
+            !bannedEmails.has(r.email)
+        )
+        .map((r) => ({
+          name: r.name,
+          country: r.country,
+          post: r.role,
+        }));
+
+      const isWHO = commName.includes('WHO');
+      const isIPC = commName.includes('IPC');
+
+      return {
+        id: isWHO ? 'who' : isIPC ? 'ipc' : 'icj',
+        name: commName,
+        delegates,
+      };
+    });
+  }, [customParticipants, bannedEmails]);
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-12 space-y-20 font-sans">
 
@@ -353,14 +432,14 @@ export const HomePage: React.FC<HomePageProps> = ({ profile }) => {
         {/* Editorial Serif Hero Title */}
         <div className="max-w-4xl mx-auto space-y-3">
           <h1
-            className="font-serif text-5xl sm:text-7xl lg:text-8xl font-normal tracking-tight leading-[0.98]"
+            className="font-serif text-4xl sm:text-6xl md:text-7xl font-normal tracking-tight leading-[1.05]"
             style={{ color: headingColor }}
           >
-            FL.Y Model UN
+            Future Leaders Youth International MUN
           </h1>
           <p
-            className="font-serif italic text-2xl sm:text-3xl text-opacity-90 tracking-tight"
-            style={{ color: dark ? '#d4d4d8' : '#1e3a8a' }}
+            className="font-serif italic text-lg sm:text-2xl font-light tracking-wide"
+            style={{ color: dark ? '#ffffff' : '#172554' }}
           >
             Diplomacy in Action &amp; Next-Gen Leadership
           </p>
@@ -455,7 +534,7 @@ export const HomePage: React.FC<HomePageProps> = ({ profile }) => {
         </div>
 
         <div>
-          {COMMITTEE_CARDS.map((committee, index) => (
+          {committeeCards.map((committee, index) => (
             <CommitteeSection
               key={committee.id}
               committee={committee}

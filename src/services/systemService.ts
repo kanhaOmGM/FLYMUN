@@ -81,6 +81,8 @@ export async function purgeAndSeedDatabase(): Promise<{
     'committee_motions',
     'voting_sessions',
     'committee_timers',
+    'custom_participants',
+    'banned_emails',
   ];
 
   const deletedCounts: Record<string, number> = {};

@@ -63,7 +63,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onBack }) => {
             className="font-serif text-4xl sm:text-6xl font-normal tracking-tight leading-[1.05]"
             style={{ color: headingColor }}
           >
-            Welcome to F.L.Y (Future Leaders Youth)
+            Welcome to FL.Y (Future Leaders. Youth)
           </h1>
 
           <p

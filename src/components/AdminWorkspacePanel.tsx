@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ShieldCheck,
   Lock,
@@ -14,13 +14,25 @@ import {
   Trash2,
   AlertTriangle,
   RefreshCw,
+  Ban,
+  UserX,
+  UserCheck,
+  UserPlus,
+  ShieldAlert,
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
-import type { UserProfile, MUNState, CommitteeTimerState, CommitteeMotion } from '../types';
+import type { UserProfile, UserRole, MUNState, CommitteeTimerState, CommitteeMotion } from '../types';
 import { setMUNState, subscribeToMUNState, purgeAndSeedDatabase } from '../services/systemService';
 import { ROSTER_MASTER_DATA, COMMITTEES, type CommitteeName } from '../data/rosterData';
 import { subscribeToTimer, subscribeToMotions } from '../services/committeeService';
-import { adminRegisterParticipant } from '../services/userService';
+import {
+  adminRegisterParticipant,
+  adminBanAndRemoveMember,
+  adminUnbanMember,
+  subscribeToBannedEmails,
+  adminAddCustomParticipant,
+  subscribeToCustomParticipants,
+} from '../services/userService';
 
 interface AdminWorkspacePanelProps {
   profile: UserProfile;
@@ -41,7 +53,7 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
   const [timers, setTimers] = useState<Record<string, CommitteeTimerState | null>>({});
   const [motions, setMotions] = useState<Record<string, CommitteeMotion[]>>({});
 
-  // ── Email Dispatch State (Reminder Dispatcher) ───────────────────────────
+  // ── Email Dispatch & Member Management State ─────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sendingBatch, setSendingBatch] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
@@ -49,11 +61,24 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
   const [searchRoster, setSearchRoster] = useState('');
   const [filterCommittee, setFilterCommittee] = useState<string>('All');
   const [sentMap, setSentMap] = useState<Record<string, boolean>>({});
+  const [banningId, setBanningId] = useState<string | null>(null);
+
+  // ── Dynamic live state for custom participants and banned emails ────────
+  const [customParticipants, setCustomParticipants] = useState<Array<{ name: string; email: string; role: UserRole; committee: string; country: string }>>([]);
+  const [bannedList, setBannedList] = useState<Array<{ email: string; name?: string; reason?: string; bannedAt?: number }>>([]);
 
   // ── Subscriptions ────────────────────────────────────────────────────────
   useEffect(() => {
     const unsubState = subscribeToMUNState((state) => {
       setMunStateLocal(state);
+    });
+
+    const unsubCustom = subscribeToCustomParticipants((list) => {
+      setCustomParticipants(list);
+    });
+
+    const unsubBanned = subscribeToBannedEmails((list) => {
+      setBannedList(list);
     });
 
     const unsubs = COMMITTEES.map((comm) => {
@@ -71,9 +96,81 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
 
     return () => {
       unsubState();
+      unsubCustom();
+      unsubBanned();
       unsubs.forEach((u) => u());
     };
   }, []);
+
+  const bannedEmailSet = useMemo(() => new Set(bannedList.map((b) => b.email.toLowerCase().trim())), [bannedList]);
+
+  // Combine static master data with custom participants and filter out banned emails
+  const activeRoster = useMemo(() => {
+    const combined = [
+      ...ROSTER_MASTER_DATA.map((r) => ({
+        id: r.id,
+        name: r.name,
+        email: r.email.toLowerCase().trim(),
+        role: r.role,
+        committee: r.committee,
+        country: r.country,
+      })),
+      ...customParticipants.map((c, idx) => ({
+        id: `custom-${idx + 1}-${c.email}`,
+        name: c.name,
+        email: c.email.toLowerCase().trim(),
+        role: c.role,
+        committee: c.committee,
+        country: c.country,
+      })),
+    ];
+
+    return combined.filter((r) => !bannedEmailSet.has(r.email));
+  }, [customParticipants, bannedEmailSet]);
+
+  // ── Ban & Unban Handlers ──────────────────────────────────────────────────
+  const handleBanParticipant = async (entry: { name: string; email: string; committee: string; role: string }) => {
+    const confirm = window.confirm(
+      `⚠ BAN & PERMANENT REMOVAL CONFIRMATION:\n\n` +
+      `Are you sure you want to PERMANENTLY REMOVE AND BAN:\n` +
+      `• Name: ${entry.name}\n` +
+      `• Email: ${entry.email}\n` +
+      `• Role: ${entry.role} (${entry.committee})\n\n` +
+      `This will immediately:\n` +
+      `1. Revoke access and prohibit this email from logging into FLYIMUN 2026.\n` +
+      `2. Remove them from all seating charts, rosters, and live committee lists.\n` +
+      `3. Delete their claimed seat, user profile, and active speaker/hand queue entries.`
+    );
+    if (!confirm) return;
+
+    setBanningId(entry.email);
+    try {
+      await adminBanAndRemoveMember(entry.email, entry.name);
+      setEmailLogs((prev) => [
+        `[${new Date().toLocaleTimeString()}] BANNED & REMOVED: ${entry.name} (${entry.email}) from ${entry.committee}.`,
+        ...prev,
+      ]);
+      alert(`Successfully banned and permanently removed ${entry.name} (${entry.email}).`);
+    } catch (err: any) {
+      console.error('Error banning participant:', err);
+      alert(`Error banning member: ${err?.message || 'Check permissions'}`);
+    } finally {
+      setBanningId(null);
+    }
+  };
+
+  const handleUnbanParticipant = async (email: string) => {
+    try {
+      await adminUnbanMember(email);
+      setEmailLogs((prev) => [
+        `[${new Date().toLocaleTimeString()}] UNBANNED: ${email}. Access restored.`,
+        ...prev,
+      ]);
+      alert(`Successfully unbanned ${email}. Access has been restored.`);
+    } catch (err: any) {
+      alert(`Error unbanning member: ${err?.message}`);
+    }
+  };
 
   // ── Toggle Lock Handler ──────────────────────────────────────────────────
   const handleToggleLock = async () => {
@@ -89,7 +186,7 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
   };
 
   // ── Send Single Reminder ─────────────────────────────────────────────────
-  const handleSendSingle = async (entry: typeof ROSTER_MASTER_DATA[0]) => {
+  const handleSendSingle = async (entry: { id: string; name: string; email: string; role: string; committee: string; country: string }) => {
     try {
       const res = await fetch('/api/send-invite', {
         method: 'POST',
@@ -119,8 +216,8 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
     }
   };
 
-  // ── Filtered Roster ──────────────────────────────────────────────────────
-  const filteredRoster = ROSTER_MASTER_DATA.filter((item) => {
+  // ── Filtered Roster (Dynamic activeRoster) ────────────────────────────────
+  const filteredRoster = activeRoster.filter((item) => {
     const matchComm = filterCommittee === 'All' || item.committee === filterCommittee;
     const matchSearch =
       searchRoster === '' ||
@@ -159,7 +256,7 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
   };
 
   // ── Send Batch Reminders ─────────────────────────────────────────────────
-  const handleSendBatch = async (targetList: typeof ROSTER_MASTER_DATA) => {
+  const handleSendBatch = async (targetList: Array<{ id: string; name: string; email: string; role: string; committee: string; country: string }>) => {
     if (targetList.length === 0) {
       alert('No participants selected to email.');
       return;
@@ -198,7 +295,7 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
           ]);
         }
       } catch (err) {
-        console.error('Batch send error:', err);
+        console.warn('Batch send error for', entry.email, err);
       }
       await new Promise((r) => setTimeout(r, 120));
     }
@@ -241,7 +338,7 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
           </div>
 
           <p className="text-xs sm:text-sm font-normal" style={{ color: mutedText }}>
-            Welcome, <strong>{profile.name || profile.displayName}</strong>. You have unrestricted administrative authority over global workspace access, committee activity, and automated email dispatches.
+            Welcome, <strong>{profile.name || profile.displayName}</strong>. You have unrestricted administrative authority over global workspace access, member management (add/ban), and automated email dispatches.
           </p>
         </div>
 
@@ -303,68 +400,91 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
         className="rounded-3xl border p-6 sm:p-8 shadow-md transition-colors duration-300 space-y-6"
         style={{ background: panelBg, borderColor: panelBorder }}
       >
-        <div>
-          <h3 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight" style={{ color: headingColor }}>
-            Live Committee Monitors (WHO, IPC, ICJ)
-          </h3>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight" style={{ color: headingColor }}>
+              Live Committee Debate Monitors
+            </h3>
+            <p className="text-xs sm:text-sm font-medium mt-1" style={{ color: mutedText }}>
+              Real-time feed tracking active speakers, ongoing debate timers, and proposed caucuses.
+            </p>
+          </div>
+          <span
+            className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full uppercase flex items-center gap-1.5"
+            style={{ background: dark ? '#18181b' : '#fef08a', color: dark ? '#ffffff' : '#172554', border: `1px solid ${panelBorder}` }}
+          >
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> Live Sync
+          </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {COMMITTEES.map((comm) => {
             const timer = timers[comm];
-            const commMotions = motions[comm] || [];
-            const activeM = commMotions.filter((m) => m.status === 'pending');
-            const passedM = commMotions.filter((m) => m.status === 'passed');
-            const isRunning = timer?.running;
+            const motionList = motions[comm] || [];
+            const pendingMotions = motionList.filter((m) => m.status === 'pending');
 
             return (
               <div
                 key={comm}
-                className="rounded-2xl border p-5 transition shadow-sm flex flex-col justify-between"
-                style={{ background: panelBg, borderColor: panelBorder }}
+                className="p-5 rounded-2xl border flex flex-col justify-between space-y-4"
+                style={{ background: dark ? '#18181b' : '#faf8f5', borderColor: panelBorder }}
               >
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <span className="font-serif text-lg font-normal truncate" style={{ color: headingColor }} title={comm}>
+                    <span className="font-serif font-bold text-base" style={{ color: headingColor }}>
                       {comm}
                     </span>
                     <span
-                      className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isRunning ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-600'
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-extrabold ${timer?.running
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-700'
+                        : 'bg-zinc-800 text-zinc-400'
                         }`}
-                    />
-                  </div>
-
-                  {/* Timer Display */}
-                  <div className="p-3 rounded-xl border mb-3 text-center" style={{ background: dark ? '#18181b' : '#faf8f5', borderColor: panelBorder }}>
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider block" style={{ color: mutedText }}>
-                      {timer?.mode || 'Speaker'} Mode
-                    </span>
-                    <span className="text-2xl font-mono font-black" style={{ color: headingColor }}>
-                      {timer ? `${Math.floor(timer.remainingSeconds / 60)}:${(timer.remainingSeconds % 60).toString().padStart(2, '0')}` : '01:00'}
-                    </span>
-                    <span className="text-[10px] font-mono font-bold uppercase block mt-0.5 opacity-80" style={{ color: isRunning ? '#10b981' : mutedText }}>
-                      {isRunning ? 'Timer Running' : 'Timer Paused'}
+                    >
+                      {timer?.running ? 'TIMER RUNNING' : 'TIMER PAUSED'}
                     </span>
                   </div>
 
-                  {/* Motions summary */}
-                  <div className="space-y-1 text-xs">
-                    <div className="flex justify-between font-medium">
-                      <span style={{ color: mutedText }}>Pending Motions:</span>
-                      <span className="font-mono font-bold" style={{ color: headingColor }}>{activeM.length}</span>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium" style={{ color: mutedText }}>
+                        Active Topic:
+                      </span>
+                      <span className="font-bold truncate max-w-[150px]" style={{ color: headingColor }}>
+                        {timer?.topic || 'General Debate'}
+                      </span>
                     </div>
-                    <div className="flex justify-between font-medium">
-                      <span style={{ color: mutedText }}>Passed Caucuses:</span>
-                      <span className="font-mono font-bold text-emerald-500">{passedM.length}</span>
+
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium" style={{ color: mutedText }}>
+                        Timer Type:
+                      </span>
+                      <span className="font-mono font-bold" style={{ color: dark ? '#ffffff' : '#172554' }}>
+                        {timer?.mode || 'Speaker'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium" style={{ color: mutedText }}>
+                        Pending Motions:
+                      </span>
+                      <span
+                        className="font-mono font-bold px-2 py-0.5 rounded-full text-[10px]"
+                        style={{
+                          background: pendingMotions.length > 0 ? '#fef08a' : (dark ? '#27272a' : '#e2e8f0'),
+                          color: pendingMotions.length > 0 ? '#172554' : (dark ? '#a1a1aa' : '#475569'),
+                        }}
+                      >
+                        {pendingMotions.length} pending
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-3 mt-3 border-t text-[11px] font-mono font-medium flex items-center justify-between" style={{ borderColor: dark ? '#27272a' : '#f1f5f9' }}>
-                  <span style={{ color: mutedText }}>
-                    {ROSTER_MASTER_DATA.filter((r) => r.committee === comm).length} Assigned Delegates
+                <div className="pt-2 border-t flex items-center justify-between text-[11px]" style={{ borderColor: panelBorder }}>
+                  <span className="font-mono" style={{ color: mutedText }}>
+                    Duration: {timer?.totalSeconds ? `${Math.floor(timer.totalSeconds / 60)}m ${timer.totalSeconds % 60}s` : '60s'}
                   </span>
-                  <span style={{ color: dark ? '#ffffff' : '#172554' }}>Live Synced</span>
+                  <span className="text-emerald-500 font-bold">Synced ✓</span>
                 </div>
               </div>
             );
@@ -372,49 +492,57 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
         </div>
       </div>
 
-      {/* ── Section 2: Invite your members (No email icon beside title) ─── */}
+      {/* ── Section 2: Member Management & Reminder Dispatcher ────────────── */}
       <div
         className="rounded-3xl border p-6 sm:p-8 shadow-md transition-colors duration-300 space-y-6"
         style={{ background: panelBg, borderColor: panelBorder }}
       >
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h3 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight" style={{ color: headingColor }}>
-              Invite your members
+              Official Member Roster &amp; Access Controls
             </h3>
             <p className="text-xs sm:text-sm font-medium mt-1" style={{ color: mutedText }}>
-              Select individuals to send reminder emails.
+              Manage delegate and chair access, permanently ban/remove members, and dispatch automated credentials via Resend.
             </p>
           </div>
+
+          <span
+            className="text-xs font-mono font-bold px-3 py-1.5 rounded-full self-start sm:self-auto"
+            style={{ background: dark ? '#18181b' : '#fef08a', color: dark ? '#ffffff' : '#172554', border: `1px solid ${panelBorder}` }}
+          >
+            {activeRoster.length} Active Participants
+          </span>
         </div>
 
-        {/* Batch Action Buttons */}
+        {/* Action Bar */}
         <div className="flex flex-wrap items-center gap-3 pt-2">
           <button
-            onClick={() => {
-              const selectedList = ROSTER_MASTER_DATA.filter((r) => selectedIds.has(r.id));
-              handleSendBatch(selectedList);
-            }}
-            disabled={sendingBatch || selectedIds.size === 0}
-            className="px-4 py-2.5 rounded-xl font-extrabold text-xs sm:text-sm flex items-center gap-2 transition shadow-sm disabled:opacity-40"
+            onClick={() => handleSendBatch(filteredRoster.filter((r) => selectedIds.has(r.id)))}
+            disabled={selectedIds.size === 0 || sendingBatch}
+            className="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm disabled:opacity-50"
             style={{
-              background: dark ? '#27272a' : '#f4f4f5',
+              background: dark ? '#27272a' : '#fef08a',
               color: dark ? '#ffffff' : '#172554',
-              border: dark ? '1px solid #3f3f46' : '1px solid #cbd5e1',
+              border: dark ? '1px solid #3f3f46' : '1px solid #fde047',
             }}
           >
             {sendingBatch ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            <span>Send Reminder to Selected ({selectedIds.size})</span>
+            <span>
+              {sendingBatch && batchProgress
+                ? `Dispatching (${batchProgress.current}/${batchProgress.total})…`
+                : `Send Reminders to Selected (${selectedIds.size})`}
+            </span>
           </button>
 
           <button
             onClick={() => handleSendBatch(filteredRoster)}
-            disabled={sendingBatch || filteredRoster.length === 0}
-            className="px-4 py-2.5 rounded-xl font-extrabold text-xs sm:text-sm flex items-center gap-2 transition shadow-sm border"
+            disabled={filteredRoster.length === 0 || sendingBatch}
+            className="px-4 py-2 rounded-xl text-xs font-bold border transition flex items-center gap-2 shadow-sm disabled:opacity-50"
             style={{
-              background: dark ? '#18181b' : '#faf8f5',
-              borderColor: panelBorder,
+              background: dark ? '#18181b' : '#ffffff',
               color: dark ? '#ffffff' : '#172554',
+              borderColor: panelBorder,
             }}
           >
             <Users className="h-4 w-4" />
@@ -460,7 +588,7 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
                 color: headingColor,
               }}
             >
-              <option value="All">All Committees ({ROSTER_MASTER_DATA.length})</option>
+              <option value="All">All Committees ({activeRoster.length})</option>
               {COMMITTEES.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -470,7 +598,7 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
           </div>
         </div>
 
-        {/* Roster Table with Multi-Select */}
+        {/* Roster Table with Multi-Select and Ban Actions */}
         <div className="overflow-x-auto rounded-2xl border max-h-96" style={{ borderColor: panelBorder }}>
           <table className="w-full text-left text-xs border-collapse">
             <thead style={{ background: dark ? '#18181b' : '#faf8f5', color: headingColor }}>
@@ -493,7 +621,7 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
                 <th className="p-3 font-extrabold">Committee</th>
                 <th className="p-3 font-extrabold">Representation</th>
                 <th className="p-3 font-extrabold">Official Email</th>
-                <th className="p-3 font-extrabold text-right">Action</th>
+                <th className="p-3 font-extrabold text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y" style={{ borderColor: panelBorder }}>
@@ -547,19 +675,31 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
                       {entry.email}
                     </td>
                     <td className="p-3 text-right">
-                      <button
-                        onClick={() => handleSendSingle(entry)}
-                        title="Send Reminder & Official Credentials"
-                        className="px-3 py-1.5 rounded-lg font-bold text-[11px] border transition shadow-sm inline-flex items-center gap-1.5"
-                        style={{
-                          background: isSent ? (dark ? '#18181b' : '#f0fdf4') : (dark ? '#27272a' : '#f4f4f5'),
-                          color: isSent ? '#10b981' : (dark ? '#ffffff' : '#172554'),
-                          borderColor: isSent ? '#059669' : (dark ? '#3f3f46' : '#cbd5e1'),
-                        }}
-                      >
-                        <Bell className="h-3 w-3" />
-                        <span>{isSent ? 'Reminder Sent ✓' : 'Send Reminder'}</span>
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleSendSingle(entry)}
+                          title="Send Reminder & Official Credentials"
+                          className="px-2.5 py-1.5 rounded-lg font-bold text-[11px] border transition shadow-sm inline-flex items-center gap-1"
+                          style={{
+                            background: isSent ? (dark ? '#18181b' : '#f0fdf4') : (dark ? '#27272a' : '#f4f4f5'),
+                            color: isSent ? '#10b981' : (dark ? '#ffffff' : '#172554'),
+                            borderColor: isSent ? '#059669' : (dark ? '#3f3f46' : '#cbd5e1'),
+                          }}
+                        >
+                          <Bell className="h-3 w-3" />
+                          <span>{isSent ? 'Sent ✓' : 'Reminder'}</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleBanParticipant(entry)}
+                          disabled={banningId === entry.email}
+                          title="Permanently Ban & Remove Member from Website"
+                          className="px-2.5 py-1.5 rounded-lg font-bold text-[11px] border border-red-800 text-red-400 hover:bg-red-950 transition inline-flex items-center gap-1 shadow-sm disabled:opacity-50"
+                        >
+                          {banningId === entry.email ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban className="h-3 w-3" />}
+                          <span>Ban &amp; Remove</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -583,7 +723,67 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
         )}
       </div>
 
-      {/* ── Section 3: Add Participant & Dispatch Test Invite (Task 6) ────── */}
+      {/* ── Section 3: Banned Accounts & Access Blacklist ─────────────────── */}
+      {bannedList.length > 0 && (
+        <div
+          className="rounded-3xl border p-6 sm:p-8 shadow-md transition-colors duration-300 space-y-4"
+          style={{
+            background: dark ? '#000000' : '#ffffff',
+            borderColor: dark ? '#3f1818' : '#fecaca',
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-red-400" />
+              <h3 className="font-serif text-2xl font-normal tracking-tight text-red-500">
+                Banned Accounts &amp; Access Blacklist ({bannedList.length})
+              </h3>
+            </div>
+            <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-800 font-bold">
+              Prohibited from Website
+            </span>
+          </div>
+
+          <div className="overflow-x-auto rounded-2xl border" style={{ borderColor: panelBorder }}>
+            <table className="w-full text-left text-xs border-collapse">
+              <thead style={{ background: dark ? '#18181b' : '#faf8f5', color: headingColor }}>
+                <tr className="border-b" style={{ borderColor: panelBorder }}>
+                  <th className="p-3 font-extrabold">Name</th>
+                  <th className="p-3 font-extrabold">Banned Email</th>
+                  <th className="p-3 font-extrabold">Reason</th>
+                  <th className="p-3 font-extrabold text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y" style={{ borderColor: panelBorder }}>
+                {bannedList.map((b) => (
+                  <tr key={b.email} className="hover:opacity-90 transition-colors">
+                    <td className="p-3 font-bold" style={{ color: headingColor }}>
+                      {b.name || 'Participant'}
+                    </td>
+                    <td className="p-3 font-mono text-red-400 font-bold">
+                      {b.email}
+                    </td>
+                    <td className="p-3 font-medium" style={{ color: mutedText }}>
+                      {b.reason || 'Banned by administrator'}
+                    </td>
+                    <td className="p-3 text-right">
+                      <button
+                        onClick={() => handleUnbanParticipant(b.email)}
+                        className="px-3 py-1.5 rounded-lg text-[11px] font-bold border border-emerald-700 text-emerald-400 hover:bg-emerald-950 transition inline-flex items-center gap-1 shadow-sm"
+                      >
+                        <UserCheck className="h-3 w-3" />
+                        <span>Restore Access</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Section 4: Add Participant & Dispatch Test Invite ──────────────── */}
       <AddParticipantSection
         dark={dark}
         panelBg={panelBg}
@@ -595,7 +795,7 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
         }}
       />
 
-      {/* ── Section 4: Hard Database Reset & Clean Seed (101 Records) ──────── */}
+      {/* ── Section 5: Hard Database Reset & Clean Seed (101 Records) ──────── */}
       <DatabaseResetSection
         dark={dark}
         panelBg={panelBg}
@@ -639,13 +839,13 @@ const AddParticipantSection: React.FC<{
     setStatusMessage(null);
 
     try {
-      // 1. Write participant to Firestore
-      await adminRegisterParticipant({
+      // 1. Write participant to Firestore custom_participants and claimed_seats
+      await adminAddCustomParticipant({
         name: name.trim(),
         email: email.trim().toLowerCase(),
         role,
         committee,
-        country: country.trim() || 'General Representation',
+        country: country.trim() || (role === 'Chair' ? 'Unassigned' : 'General Representation'),
       });
 
       // 2. Dispatch official invite email via Resend API

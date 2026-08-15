@@ -11,6 +11,7 @@ import {
   sendPasswordResetEmail,
 } from 'firebase/auth';
 import { auth } from '../firebase';
+import { isEmailBanned } from '../services/userService';
 
 // ---------------------------------------------------------------------------
 // AuthContext – email/password + Google Sign-In with Popup + Password Reset
@@ -53,7 +54,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser?.email) {
+        try {
+          const banned = await isEmailBanned(firebaseUser.email);
+          if (banned) {
+            await firebaseSignOut(auth);
+            setUser(null);
+            setError(`Your account (${firebaseUser.email}) has been permanently banned from FLYIMUN 2026.`);
+            setLoading(false);
+            return;
+          }
+        } catch (banCheckErr) {
+          console.warn('Ban check warning:', banCheckErr);
+        }
+      }
       setUser(firebaseUser);
       setLoading(false);
     });
@@ -66,6 +81,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     try {
       setError(null);
+      const banned = await isEmailBanned(email);
+      if (banned) {
+        setError(`Your account (${email}) has been permanently banned from FLYIMUN 2026.`);
+        return;
+      }
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err: any) {
       setError(mapFirebaseError(err.code));
@@ -75,6 +95,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string, displayName: string) => {
     try {
       setError(null);
+      const banned = await isEmailBanned(email);
+      if (banned) {
+        setError(`This email (${email}) has been permanently banned from FLYIMUN 2026.`);
+        return;
+      }
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(cred.user, { displayName });
     } catch (err: any) {
@@ -87,7 +112,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setError(null);
       const result = await signInWithPopup(auth, googleProvider);
-      if (result?.user) {
+      if (result?.user?.email) {
+        const banned = await isEmailBanned(result.user.email);
+        if (banned) {
+          await firebaseSignOut(auth);
+          setUser(null);
+          setError(`Your account (${result.user.email}) has been permanently banned from FLYIMUN 2026.`);
+          return;
+        }
         setUser(result.user);
       }
     } catch (err: any) {

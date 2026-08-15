@@ -9,6 +9,11 @@ import {
   collection,
   onSnapshot,
   serverTimestamp,
+  query,
+  where,
+  getDocs,
+  deleteDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { UserProfile, UserRole } from '../types';
@@ -203,5 +208,167 @@ export async function adminRegisterParticipant(data: {
   );
 
   return syntheticUid;
+}
+
+/**
+ * Permanently ban an email and remove the member from all active rosters, claimed seats, and user collections.
+ */
+export async function adminBanAndRemoveMember(
+  email: string,
+  name?: string,
+  reason?: string
+): Promise<{ deletedSeats: number; deletedUsers: number }> {
+  if (!email) throw new Error('Email is required to ban a member.');
+  const cleanEmail = email.toLowerCase().trim();
+
+  // 1. Record in banned_emails collection in Firestore
+  const bannedDocRef = doc(db, 'banned_emails', cleanEmail.replace(/[^a-z0-9]/g, '_'));
+  await setDoc(bannedDocRef, {
+    email: cleanEmail,
+    name: name || 'Unknown Participant',
+    reason: reason || 'Permanently removed and banned by administrator',
+    bannedAt: Date.now(),
+  });
+
+  // 2. Delete all claimed seats matching this email
+  const seatsQuery = query(collection(db, 'claimed_seats'), where('email', '==', cleanEmail));
+  const seatsSnap = await getDocs(seatsQuery);
+  const batch1 = writeBatch(db);
+  seatsSnap.forEach((d) => batch1.delete(d.ref));
+  await batch1.commit();
+
+  // 3. Delete any user profiles matching this email
+  const usersQuery = query(collection(db, 'users'), where('email', '==', cleanEmail));
+  const usersSnap = await getDocs(usersQuery);
+  const batch2 = writeBatch(db);
+  usersSnap.forEach((d) => batch2.delete(d.ref));
+  await batch2.commit();
+
+  // 4. Delete any custom participant entry
+  try {
+    const customDocRef = doc(db, 'custom_participants', cleanEmail.replace(/[^a-z0-9]/g, '_'));
+    await deleteDoc(customDocRef);
+  } catch (err) {
+    console.warn('Custom participant deletion warning:', err);
+  }
+
+  // 5. Delete from committee speakers and hands if present
+  try {
+    const speakersQuery = query(collection(db, 'committee_speakers'), where('name', '==', name || ''));
+    const speakersSnap = await getDocs(speakersQuery);
+    const batch3 = writeBatch(db);
+    speakersSnap.forEach((d) => batch3.delete(d.ref));
+    await batch3.commit();
+  } catch (err) {
+    console.warn('Speaker cleanup warning:', err);
+  }
+
+  return {
+    deletedSeats: seatsSnap.size,
+    deletedUsers: usersSnap.size,
+  };
+}
+
+/**
+ * Remove an email from the banned list.
+ */
+export async function adminUnbanMember(email: string): Promise<void> {
+  const cleanEmail = email.toLowerCase().trim();
+  const bannedDocRef = doc(db, 'banned_emails', cleanEmail.replace(/[^a-z0-9]/g, '_'));
+  await deleteDoc(bannedDocRef);
+}
+
+/**
+ * Check whether an email is currently banned.
+ */
+export async function isEmailBanned(email: string): Promise<boolean> {
+  if (!email) return false;
+  const cleanEmail = email.toLowerCase().trim();
+  const bannedDocRef = doc(db, 'banned_emails', cleanEmail.replace(/[^a-z0-9]/g, '_'));
+  const snap = await getDoc(bannedDocRef);
+  return snap.exists();
+}
+
+/**
+ * Subscribe to real-time banned emails.
+ */
+export function subscribeToBannedEmails(
+  callback: (bannedList: Array<{ email: string; name?: string; reason?: string; bannedAt?: number }>) => void
+): () => void {
+  const colRef = collection(db, 'banned_emails');
+  return onSnapshot(
+    colRef,
+    (snap) => {
+      const list = snap.docs.map((d) => d.data() as { email: string; name?: string; reason?: string; bannedAt?: number });
+      callback(list);
+    },
+    (err) => {
+      console.warn('Banned emails listener warning:', err);
+      callback([]);
+    }
+  );
+}
+
+/**
+ * Add a dynamic participant that persists in Firestore across all clients and appears on the seating chart/roster.
+ */
+export async function adminAddCustomParticipant(data: {
+  name: string;
+  email: string;
+  role: UserRole;
+  committee: string;
+  country: string;
+}): Promise<string> {
+  const cleanEmail = data.email.toLowerCase().trim();
+  const docKey = cleanEmail.replace(/[^a-z0-9]/g, '_');
+
+  // 1. Save to custom_participants in Firestore
+  const customRef = doc(db, 'custom_participants', docKey);
+  await setDoc(customRef, {
+    name: data.name.trim(),
+    email: cleanEmail,
+    role: data.role,
+    committee: data.committee,
+    model_country_assigned: data.country.trim() || (data.role === 'Chair' ? 'Unassigned' : 'General Representation'),
+    addedAt: Date.now(),
+  });
+
+  // 2. Also register participant and claim seat
+  return await adminRegisterParticipant({
+    name: data.name.trim(),
+    email: cleanEmail,
+    role: data.role,
+    committee: data.committee,
+    country: data.country.trim() || (data.role === 'Chair' ? 'Unassigned' : 'General Representation'),
+  });
+}
+
+/**
+ * Subscribe to custom participants added by admins.
+ */
+export function subscribeToCustomParticipants(
+  callback: (participants: Array<{ name: string; email: string; role: UserRole; committee: string; country: string }>) => void
+): () => void {
+  const colRef = collection(db, 'custom_participants');
+  return onSnapshot(
+    colRef,
+    (snap) => {
+      const list = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          name: data.name,
+          email: data.email,
+          role: data.role as UserRole,
+          committee: data.committee,
+          country: data.model_country_assigned || data.country || 'Unassigned',
+        };
+      });
+      callback(list);
+    },
+    (err) => {
+      console.warn('Custom participants listener warning:', err);
+      callback([]);
+    }
+  );
 }
 

@@ -102,7 +102,20 @@ service cloud.firestore {
     }
 
     // =========================================================================
-    // 10. Default Deny for all other collections
+    // 10. Banned Emails & Custom Participants (Admin Management)
+    // =========================================================================
+    match /banned_emails/{emailKey} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /custom_participants/{partId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // =========================================================================
+    // 11. Default Deny for all other collections
     // =========================================================================
     match /{document=**} {
       allow read, write: if false;

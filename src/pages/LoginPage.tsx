@@ -411,13 +411,6 @@ export const LoginPage: React.FC = () => {
               borderColor: rightBorder,
             }}
           >
-            <div className="flex items-center justify-center gap-1.5 text-[11px] font-mono font-semibold" style={{ color: dark ? '#d4d4d8' : '#1e3a8a' }}>
-              <ShieldCheck className="h-3.5 w-3.5 text-amber-500" />
-              <span>Event Organiser & Admin Access</span>
-            </div>
-            <p className="text-[10px] mt-1 font-medium" style={{ color: dark ? '#94a3b8' : '#64748b' }}>
-              Multiple organizers & admins can sign in with individual accounts and enter the admin security key during onboarding.
-            </p>
           </div>
         </div>
       </div>
