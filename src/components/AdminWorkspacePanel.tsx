@@ -11,10 +11,13 @@ import {
   Square,
   Search,
   Loader2,
+  Trash2,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import type { UserProfile, MUNState, CommitteeTimerState, CommitteeMotion } from '../types';
-import { setMUNState, subscribeToMUNState } from '../services/systemService';
+import { setMUNState, subscribeToMUNState, purgeAndSeedDatabase } from '../services/systemService';
 import { ROSTER_MASTER_DATA, COMMITTEES, type CommitteeName } from '../data/rosterData';
 import { subscribeToTimer, subscribeToMotions } from '../services/committeeService';
 import { adminRegisterParticipant } from '../services/userService';
@@ -592,6 +595,18 @@ export const AdminWorkspacePanel: React.FC<AdminWorkspacePanelProps> = ({ profil
         }}
       />
 
+      {/* ── Section 4: Hard Database Reset & Clean Seed (101 Records) ──────── */}
+      <DatabaseResetSection
+        dark={dark}
+        panelBg={panelBg}
+        panelBorder={panelBorder}
+        headingColor={headingColor}
+        mutedText={mutedText}
+        onResetComplete={(logMsg) => {
+          setEmailLogs((prev) => [logMsg, ...prev]);
+        }}
+      />
+
     </div>
   );
 };
@@ -833,6 +848,130 @@ const AddParticipantSection: React.FC<{
           )}
         </button>
       </form>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Database Reset & Hard Wipe Component (101 Records)
+// ---------------------------------------------------------------------------
+
+const DatabaseResetSection: React.FC<{
+  dark: boolean;
+  panelBg: string;
+  panelBorder: string;
+  headingColor: string;
+  mutedText: string;
+  onResetComplete: (log: string) => void;
+}> = ({ dark, panelBg, panelBorder, headingColor, mutedText, onResetComplete }) => {
+  const [purging, setPurging] = useState(false);
+  const [resetStats, setResetStats] = useState<{
+    deletedCounts: Record<string, number>;
+    totalSeeded: number;
+  } | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const handleExecutePurge = async () => {
+    const confirmation = window.confirm(
+      '⚠ CRITICAL DATABASE HARD RESET WARNING:\n\n' +
+      'This routine will permanently PURGE all active Firestore documents across:\n' +
+      '• users & claimed_seats\n' +
+      '• committee_speakers (General Speakers List queues)\n' +
+      '• committee_hands (Raised hands)\n' +
+      '• committee_motions (Motions & Caucuses)\n' +
+      '• voting_sessions (Voting rooms)\n' +
+      '• committee_timers & client storage caches\n\n' +
+      'And re-seed exclusively the 101 official real participants.\n\n' +
+      'Are you sure you want to proceed?'
+    );
+
+    if (!confirmation) return;
+
+    setPurging(true);
+    setErrorMsg(null);
+    setResetStats(null);
+
+    try {
+      const result = await purgeAndSeedDatabase();
+      setResetStats(result);
+      const log = `[${new Date().toLocaleTimeString()}] DATABASE HARD PURGE & SEED COMPLETED: Cleared collections (${Object.entries(result.deletedCounts).map(([k, v]) => `${k}:${v}`).join(', ')}) · Seeded ${result.totalSeeded} Official Participants.`;
+      onResetComplete(log);
+    } catch (err: any) {
+      console.error('Database purge error:', err);
+      setErrorMsg(err?.message || 'Failed to complete database hard wipe.');
+    } finally {
+      setPurging(false);
+    }
+  };
+
+  return (
+    <div
+      className="rounded-3xl border p-6 sm:p-8 shadow-md transition-colors duration-300 space-y-6"
+      style={{
+        background: dark ? '#000000' : '#ffffff',
+        borderColor: dark ? '#3f1818' : '#fecaca',
+      }}
+    >
+      <div className="flex items-center gap-3">
+        <div className="p-2.5 rounded-2xl bg-red-500/20 text-red-400 border border-red-500/40">
+          <Trash2 className="h-6 w-6" />
+        </div>
+        <div>
+          <h3 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-red-500">
+            Database Hard Reset &amp; Seed (101 Records)
+          </h3>
+          <p className="text-xs sm:text-sm font-medium mt-0.5" style={{ color: mutedText }}>
+            Wipe all previous records, mock entries, speaker lists, and active queues, and populate exclusively with the 101 official participants.
+          </p>
+        </div>
+      </div>
+
+      {resetStats && (
+        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 space-y-2 text-xs sm:text-sm">
+          <div className="font-bold flex items-center gap-2">
+            <span>✓ Hard Reset &amp; Seed Successful!</span>
+          </div>
+          <p className="font-medium text-xs">
+            Database wiped clean. Successfully seeded <strong>{resetStats.totalSeeded} official participants</strong> into Firestore claimed seats.
+          </p>
+          <div className="flex flex-wrap gap-2 pt-1 font-mono text-[11px]">
+            {Object.entries(resetStats.deletedCounts).map(([col, count]) => (
+              <span key={col} className="px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/80">
+                {col}: {count} purged
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/40 text-red-400 text-xs sm:text-sm font-bold flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+        <div className="text-xs" style={{ color: mutedText }}>
+          Target Collections: <span className="font-mono text-[11px]">users, claimed_seats, committee_speakers, committee_hands, committee_motions, voting_sessions, committee_timers</span>
+        </div>
+
+        <button
+          onClick={handleExecutePurge}
+          disabled={purging}
+          className="px-6 py-3 rounded-2xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-md bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+        >
+          {purging ? (
+            <>
+              <RefreshCw className="h-4 w-4 animate-spin" /> Purging Database &amp; Seeding 101 Participants…
+            </>
+          ) : (
+            <>
+              <Trash2 className="h-4 w-4" /> Hard Wipe Database &amp; Seed 101 Participants
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
 };

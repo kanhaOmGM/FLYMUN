@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Official FLYIMUN 2026 Master Roster Dataset (105 Records)
+// Official FLYIMUN 2026 Master Roster Dataset (101 Participants)
 // ---------------------------------------------------------------------------
 
 import type { UserRole } from '../types';
@@ -31,20 +31,6 @@ export interface RawParticipant {
 }
 
 export const OFFICIAL_DATASET: RawParticipant[] = [
-  {
-    "name": "Abdulrahman Hafez Abd",
-    "email": "cm.kaiwolfhard@gmail.com",
-    "role": "Chair",
-    "committee": "Unassigned",
-    "model_country_assigned": "Unassigned"
-  },
-  {
-    "name": "Madhukshara Nagarajan",
-    "email": "madhuksharanagarajan276@gmail.com",
-    "role": "Chair",
-    "committee": "Unassigned",
-    "model_country_assigned": "Unassigned"
-  },
   {
     "name": "Ananya Rasal",
     "email": "rasalananya8@gmail.com",
@@ -106,13 +92,6 @@ export const OFFICIAL_DATASET: RawParticipant[] = [
     "email": "zakiyaqureshi139@gmail.com",
     "role": "Chair",
     "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Unassigned"
-  },
-  {
-    "name": "Diyaa Lhaq Aaboud",
-    "email": "diyaablink7@gmail.com",
-    "role": "Chair",
-    "committee": "World Health Organization (WHO)",
     "model_country_assigned": "Unassigned"
   },
   {
@@ -534,13 +513,6 @@ export const OFFICIAL_DATASET: RawParticipant[] = [
     "role": "Delegate",
     "committee": "International Court of Justice (ICJ)",
     "model_country_assigned": "Tuvalu"
-  },
-  {
-    "name": "Anousha Vohra",
-    "email": "anoushavohra86@gmail.com",
-    "role": "Delegate",
-    "committee": "Unassigned",
-    "model_country_assigned": "Unassigned"
   },
   {
     "name": "Hala Nassar",
