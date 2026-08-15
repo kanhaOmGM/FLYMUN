@@ -35,7 +35,7 @@ interface CommitteeConfig {
 
 const COMMITTEE_CARDS: CommitteeConfig[] = COMMITTEES.map((commName) => {
   const delegates = ROSTER_MASTER_DATA
-    .filter((r) => r.committee === commName)
+    .filter((r) => r.committee === commName && r.role !== 'Observer')
     .map((r) => ({
       name: r.name,
       country: r.country,

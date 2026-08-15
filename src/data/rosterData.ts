@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Official FLY MUN Master Roster Dataset
+// Official FLYIMUN 2026 Master Roster Dataset (105 Records)
 // ---------------------------------------------------------------------------
 
 import type { UserRole } from '../types';
@@ -116,6 +116,13 @@ export const OFFICIAL_DATASET: RawParticipant[] = [
     "model_country_assigned": "Unassigned"
   },
   {
+    "name": "Pratik Patni",
+    "email": "pratikpatni194s@gmail.com",
+    "role": "Delegate",
+    "committee": "International Court of Justice (ICJ)",
+    "model_country_assigned": "Netherlands"
+  },
+  {
     "name": "Rashika Rao",
     "email": "rashikarao10@gmail.com",
     "role": "Delegate",
@@ -186,466 +193,473 @@ export const OFFICIAL_DATASET: RawParticipant[] = [
     "model_country_assigned": "Georgia"
   },
   {
-    "name": "Ananya Roy",
-    "email": "ananyaroy533@gmail.com",
+    "name": "noor fatima",
+    "email": "noorayfatima196@gmail.com",
     "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Switzerland"
+    "committee": "International Press Corps (IPC)",
+    "model_country_assigned": "Voice of America (VOA)"
   },
   {
-    "name": "Irem Tokak",
-    "email": "tokakirem@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Cyprus"
-  },
-  {
-    "name": "Advika Roy",
-    "email": "advika.roy07@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "United States of America"
-  },
-  {
-    "name": "Hana Zekic",
-    "email": "hanazekic3@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Israel"
-  },
-  {
-    "name": "Aylin Naz",
-    "email": "aylinnazkaya1308@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Czech Republic"
-  },
-  {
-    "name": "Samar Saini",
-    "email": "samarsaini230@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Spain"
-  },
-  {
-    "name": "Zubeyr Batur",
-    "email": "zubeyrbatur12@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Estonia"
-  },
-  {
-    "name": "Syeda Ayla",
-    "email": "aylaraza39@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Lebanon"
-  },
-  {
-    "name": "Siddharth Rajpurohit",
-    "email": "siddharthrajpurohit183@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Russian Federation"
-  },
-  {
-    "name": "Ahmet Alp",
-    "email": "alpefeozkan@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Japan"
-  },
-  {
-    "name": "Alya Kılavuz",
-    "email": "alyakilavuz@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Bulgaria"
-  },
-  {
-    "name": "Ananya Jha",
-    "email": "ananyajha244@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "India"
-  },
-  {
-    "name": "Ksenia Charkina",
-    "email": "kseniiacharkina25@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "France"
-  },
-  {
-    "name": "Yara Mahmoud",
-    "email": "yaramahmoud1108@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Germany"
-  },
-  {
-    "name": "Duru Buse",
-    "email": "durubusecinar@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Kazakhstan"
-  },
-  {
-    "name": "Manya Sharma",
-    "email": "manyasharma596@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "United Kingdom"
-  },
-  {
-    "name": "Sultan Alhabsi",
-    "email": "sultan.k.habsi@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Oman"
-  },
-  {
-    "name": "Fatma Zehra",
-    "email": "fatmazehrakoksal13@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Jordan"
-  },
-  {
-    "name": "Ananya Sharma",
-    "email": "ananya.sharma1910@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Norway"
-  },
-  {
-    "name": "Ahmad Mustafa",
-    "email": "ahmad.k.mustafa2010@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Saudi Arabia"
-  },
-  {
-    "name": "Cemile Beren",
-    "email": "cemileberenozdemir@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Armenia"
-  },
-  {
-    "name": "Ece Naz",
-    "email": "yalcinece949@gmail.com",
+    "name": "khushi gupta",
+    "email": "tanya.gupta.2011.09@gmail.com",
     "role": "Delegate",
     "committee": "World Health Organization (WHO)",
     "model_country_assigned": "Egypt"
   },
   {
-    "name": "Advaith Ananth",
-    "email": "advaith.ananth@gmail.com",
+    "name": "Aashvi jindal",
+    "email": "aashvu0101@gmail.com",
     "role": "Delegate",
     "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Netherlands"
+    "model_country_assigned": "Switzerland"
   },
   {
-    "name": "Arshia Mishra",
-    "email": "arshiamishra1109@gmail.com",
+    "name": "Aarya Singh",
+    "email": "aaryaa.s.mail@gmail.com",
     "role": "Delegate",
-    "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Spain"
-  },
-  {
-    "name": "Görkem Çolak",
-    "email": "gorkemcolak5@gmail.com",
-    "role": "Delegate",
-    "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "United States of America"
-  },
-  {
-    "name": "Arya Vardhan",
-    "email": "aryavardhangandhi@gmail.com",
-    "role": "Delegate",
-    "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "India"
-  },
-  {
-    "name": "Ali Eren",
-    "email": "alieren.yalcinn@gmail.com",
-    "role": "Delegate",
-    "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Bulgaria"
-  },
-  {
-    "name": "Rayaan Baweja",
-    "email": "rayaanbaweja123@gmail.com",
-    "role": "Delegate",
-    "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Norway"
-  },
-  {
-    "name": "Amina Dervishi",
-    "email": "amina.dervishi.2009@gmail.com",
-    "role": "Delegate",
-    "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Germany"
-  },
-  {
-    "name": "Irem Su",
-    "email": "iremsutuncel6@gmail.com",
-    "role": "Delegate",
-    "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "United Kingdom"
-  },
-  {
-    "name": "Vaniya Batool",
-    "email": "vaniyabatool10@gmail.com",
-    "role": "Delegate",
-    "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Australia"
-  },
-  {
-    "name": "Ayşe Ebrar",
-    "email": "ayseebrarkartal@gmail.com",
-    "role": "Delegate",
-    "committee": "International Court of Justice (ICJ)",
+    "committee": "World Health Organization (WHO)",
     "model_country_assigned": "France"
   },
   {
-    "name": "Mustafa Tuna",
-    "email": "mustafatunakocoglu@gmail.com",
+    "name": "yuvika chopra",
+    "email": "choprayuvika@gmail.com",
     "role": "Delegate",
-    "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Japan"
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "Bahamas"
   },
   {
-    "name": "Aylin Mina",
-    "email": "aylinminakaya@gmail.com",
+    "name": "Aayisha Sathar",
+    "email": "aayishasathar.2022@gmail.com",
     "role": "Delegate",
-    "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Greece"
+    "committee": "International Press Corps (IPC)",
+    "model_country_assigned": "The Nation"
   },
   {
-    "name": "Luka Kvantaliani",
-    "email": "kvantalianiluka10@gmail.com",
+    "name": "Ali Saker",
+    "email": "ali.saker2009@gmail.com",
     "role": "Delegate",
-    "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Poland"
+    "committee": "International Press Corps (IPC)",
+    "model_country_assigned": "Channels Television"
   },
   {
-    "name": "Ceren Duru",
-    "email": "cerenduru.karakas@gmail.com",
+    "name": "Falak Naz",
+    "email": "fnaz9148@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "Czech Republic"
+  },
+  {
+    "name": "Akanksha Janke",
+    "email": "akankshajanke@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "Denmark"
+  },
+  {
+    "name": "Shivam Jha",
+    "email": "shrutvikjha@gmail.com",
+    "role": "Delegate",
+    "committee": "International Press Corps (IPC)",
+    "model_country_assigned": "Milenio"
+  },
+  {
+    "name": "Dhara Arora",
+    "email": "dhaaaaraaaa08@gmail.com",
+    "role": "Delegate",
+    "committee": "International Press Corps (IPC)",
+    "model_country_assigned": "SBS News"
+  },
+  {
+    "name": "Kunal Raj Holkar",
+    "email": "aarushiraj178@gmail.com",
+    "role": "Delegate",
+    "committee": "International Court of Justice (ICJ)",
+    "model_country_assigned": "Bangladesh"
+  },
+  {
+    "name": "Jivanshi madan",
+    "email": "jivanshimadan11@gmail.com",
+    "role": "Delegate",
+    "committee": "International Court of Justice (ICJ)",
+    "model_country_assigned": "DPR Korea"
+  },
+  {
+    "name": "hifza hassan",
+    "email": "hifzahasan2011@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "Bulgaria"
+  },
+  {
+    "name": "Varun Kandpal",
+    "email": "varunkandpal236@gmail.com",
+    "role": "Delegate",
+    "committee": "International Press Corps (IPC)",
+    "model_country_assigned": "ANTARA"
+  },
+  {
+    "name": "Saif ullah",
+    "email": "saifcom098123@gmail.com",
+    "role": "Delegate",
+    "committee": "International Court of Justice (ICJ)",
+    "model_country_assigned": "Ethiopia"
+  },
+  {
+    "name": "Eshaan Siddiqui",
+    "email": "webweve2026@gmail.com",
+    "role": "Delegate",
+    "committee": "International Court of Justice (ICJ)",
+    "model_country_assigned": "Algeria"
+  },
+  {
+    "name": "Fatima ghulamullah",
+    "email": "fatimaghulamullah6@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "Australia"
+  },
+  {
+    "name": "Maanyag Vasquez",
+    "email": "maanyaghv@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "Algeria"
+  },
+  {
+    "name": "Shreyaas .S",
+    "email": "shreyaas203@gmail.com",
+    "role": "Delegate",
+    "committee": "International Court of Justice (ICJ)",
+    "model_country_assigned": "Denmark"
+  },
+  {
+    "name": "Lisha S Liju",
+    "email": "lishalijushailveena@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "Canada"
+  },
+  {
+    "name": "Momina ahmad",
+    "email": "mominaahmad60@gmail.com",
+    "role": "Delegate",
+    "committee": "International Press Corps (IPC)",
+    "model_country_assigned": "Arirang TV"
+  },
+  {
+    "name": "Ezel Dülger",
+    "email": "ezeldulger1@gmail.com",
+    "role": "Delegate",
+    "committee": "International Press Corps (IPC)",
+    "model_country_assigned": "Agência Brasil"
+  },
+  {
+    "name": "Keeya Roy Paul",
+    "email": "keeya.roypaul999@gmail.com",
+    "role": "Delegate",
+    "committee": "International Press Corps (IPC)",
+    "model_country_assigned": "NHK World"
+  },
+  {
+    "name": "Sameer Ali",
+    "email": "sameer.ali161782@gmail.com",
+    "role": "Delegate",
+    "committee": "International Press Corps (IPC)",
+    "model_country_assigned": "DD News"
+  },
+  {
+    "name": "Anna Klimova",
+    "email": "677753355as@gmail.com",
+    "role": "Delegate",
+    "committee": "International Press Corps (IPC)",
+    "model_country_assigned": "CGTN"
+  },
+  {
+    "name": "Muhammad Arhum Shafique",
+    "email": "arhummuhammad924@gmail.com",
+    "role": "Delegate",
+    "committee": "International Press Corps (IPC)",
+    "model_country_assigned": "Dawn News"
+  },
+  {
+    "name": "Gleb Myroshnyk",
+    "email": "pugerfaver@gmail.com",
+    "role": "Delegate",
+    "committee": "International Press Corps (IPC)",
+    "model_country_assigned": "CBC News"
+  },
+  {
+    "name": "Aditya Verma",
+    "email": "moonanshul@gmail.com",
+    "role": "Delegate",
+    "committee": "International Court of Justice (ICJ)",
+    "model_country_assigned": "Kiribati"
+  },
+  {
+    "name": "Alina Rizvi",
+    "email": "alinarizvi626@gmail.com",
     "role": "Delegate",
     "committee": "International Court of Justice (ICJ)",
     "model_country_assigned": "Brazil"
   },
   {
-    "name": "Aditya Singh",
-    "email": "adityasingh2348@gmail.com",
+    "name": "Seerat Zainab",
+    "email": "seerat.zainab.2011@gmail.com",
     "role": "Delegate",
     "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Russian Federation"
+    "model_country_assigned": "Indonesia"
   },
   {
-    "name": "Ali Taha",
-    "email": "alitaha.dilek@gmail.com",
+    "name": "Momin Khan",
+    "email": "sardarmominkhan8@gmail.com",
     "role": "Delegate",
     "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Ukraine"
+    "model_country_assigned": "China"
   },
   {
-    "name": "Aaditya Vatsal",
-    "email": "vatsalaaditya@gmail.com",
+    "name": "Muhammad Usman",
+    "email": "mianu4431@gmail.com",
     "role": "Delegate",
     "committee": "International Press Corps (IPC)",
     "model_country_assigned": "Al Jazeera"
   },
   {
-    "name": "Arya Vardhan",
-    "email": "aryavardhan.gandhi@gmail.com",
+    "name": "Rimsha Suhel",
+    "email": "rimshas2907@gmail.com",
     "role": "Delegate",
     "committee": "International Press Corps (IPC)",
-    "model_country_assigned": "CNN"
+    "model_country_assigned": "SABC News"
   },
   {
-    "name": "Reyansh Mishra",
-    "email": "reyanshmishra2012@gmail.com",
-    "role": "Delegate",
-    "committee": "International Press Corps (IPC)",
-    "model_country_assigned": "BBC"
-  },
-  {
-    "name": "Ananya S",
-    "email": "ananyas.contact@gmail.com",
-    "role": "Delegate",
-    "committee": "International Press Corps (IPC)",
-    "model_country_assigned": "The New York Times"
-  },
-  {
-    "name": "Samar Singh",
-    "email": "samarsingh.contact@gmail.com",
-    "role": "Delegate",
-    "committee": "International Press Corps (IPC)",
-    "model_country_assigned": "The Guardian"
-  },
-  {
-    "name": "Zaid Khan",
-    "email": "zaidkhan.mun@gmail.com",
+    "name": "Mahi Dwivedi",
+    "email": "mohiisus2@gmail.com",
     "role": "Delegate",
     "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Unassigned"
+    "model_country_assigned": "Italy"
   },
   {
-    "name": "Advait Rao",
-    "email": "advait.rao@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Unassigned"
-  },
-  {
-    "name": "Devansh Gupta",
-    "email": "devanshgupta.mun@gmail.com",
+    "name": "Maitreyi Bhardwaj",
+    "email": "maitreyi12515@gmail.com",
     "role": "Delegate",
     "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Unassigned"
+    "model_country_assigned": "France"
   },
   {
-    "name": "Sneha Sen",
-    "email": "snehasen.academic@gmail.com",
+    "name": "Semih Akgün",
+    "email": "akgunsemih1615@gmail.com",
     "role": "Delegate",
-    "committee": "International Press Corps (IPC)",
+    "committee": "Unassigned",
     "model_country_assigned": "Unassigned"
   },
   {
-    "name": "Pranav Nair",
-    "email": "pranavnair.mun@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Unassigned"
-  },
-  {
-    "name": "Tara Chawla",
-    "email": "tarachawla@gmail.com",
+    "name": "Kaushiki Gupta",
+    "email": "kaush009gupta@gmail.com",
     "role": "Delegate",
     "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Unassigned"
+    "model_country_assigned": "Australia"
   },
   {
-    "name": "Meera Iyer",
-    "email": "meeraiyer.mun@gmail.com",
-    "role": "Delegate",
-    "committee": "International Press Corps (IPC)",
-    "model_country_assigned": "Unassigned"
-  },
-  {
-    "name": "Kabir Das",
-    "email": "kabirdas.contact@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Unassigned"
-  },
-  {
-    "name": "Anika Sen",
-    "email": "anikasen@gmail.com",
+    "name": "Emiliano Espinoza Diaz",
+    "email": "emiliano.espinoza.d2010@gmail.com",
     "role": "Delegate",
     "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Unassigned"
+    "model_country_assigned": "Germany"
   },
   {
-    "name": "Rohan Malhotra",
-    "email": "rohanmalhotra.mun@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Unassigned"
-  },
-  {
-    "name": "Kavya Menon",
-    "email": "kavyamenon.mun@gmail.com",
-    "role": "Delegate",
-    "committee": "International Press Corps (IPC)",
-    "model_country_assigned": "Unassigned"
-  },
-  {
-    "name": "Tanmay Verma",
-    "email": "tanmayverma@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Unassigned"
-  },
-  {
-    "name": "Isha Joshi",
-    "email": "ishajoshi.mun@gmail.com",
+    "name": "Dan Mark Balocos",
+    "email": "balocosdanmark@gmail.com",
     "role": "Delegate",
     "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Unassigned"
+    "model_country_assigned": "Japan"
   },
   {
-    "name": "Arjun Singhania",
-    "email": "arjunsinghania.mun@gmail.com",
+    "name": "Muhammad Azan",
+    "email": "azanarshad779@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "Brazil"
+  },
+  {
+    "name": "Ayesha Tahir",
+    "email": "ayeshatahir3011@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "Indonesia"
+  },
+  {
+    "name": "Rukaia Sameh",
+    "email": "cfemena1@gmail.com",
     "role": "Delegate",
     "committee": "International Press Corps (IPC)",
-    "model_country_assigned": "Unassigned"
+    "model_country_assigned": "BBC World Service"
   },
   {
-    "name": "Diya Pillai",
-    "email": "diyapillai.mun@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Unassigned"
-  },
-  {
-    "name": "Siddhesh Kulkarni",
-    "email": "siddheshkulkarni@gmail.com",
+    "name": "Kris Ann Shelly",
+    "email": "kroissantshells@gmail.com",
     "role": "Delegate",
     "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Unassigned"
+    "model_country_assigned": "India"
   },
   {
-    "name": "Avani Deshmukh",
-    "email": "avanideshmukh.mun@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Unassigned"
-  },
-  {
-    "name": "Dhruv Kapoor",
-    "email": "dhruvkapoor@gmail.com",
+    "name": "Nynieshia Alex",
+    "email": "nynieshiaalex@gmail.com",
     "role": "Delegate",
     "committee": "International Press Corps (IPC)",
-    "model_country_assigned": "Unassigned"
+    "model_country_assigned": "France 24"
   },
   {
-    "name": "Rhea Chakraborty",
-    "email": "rheachakraborty.mun@gmail.com",
-    "role": "Delegate",
-    "committee": "International Court of Justice (ICJ)",
-    "model_country_assigned": "Unassigned"
-  },
-  {
-    "name": "Varun Saxena",
-    "email": "varunsaxena@gmail.com",
-    "role": "Delegate",
-    "committee": "World Health Organization (WHO)",
-    "model_country_assigned": "Unassigned"
-  },
-  {
-    "name": "Nandini Bhatt",
-    "email": "nandinibhatt.mun@gmail.com",
+    "name": "Ayesha Salman",
+    "email": "ayeshasalman013@gmail.com",
     "role": "Delegate",
     "committee": "International Press Corps (IPC)",
-    "model_country_assigned": "Unassigned"
+    "model_country_assigned": "TRT World"
   },
   {
-    "name": "Shaurya Mehra",
-    "email": "shauryamehra@gmail.com",
+    "name": "Ansh Patel",
+    "email": "anshp8281@gmail.com",
     "role": "Delegate",
     "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "India"
+  },
+  {
+    "name": "Gorav Singh Chhillar",
+    "email": "goravschhillar@gmail.com",
+    "role": "Delegate",
+    "committee": "International Press Corps (IPC)",
+    "model_country_assigned": "Deutsche Welle"
+  },
+  {
+    "name": "Anushka Na",
+    "email": "anushka432009@gmail.com",
+    "role": "Delegate",
+    "committee": "International Court of Justice (ICJ)",
+    "model_country_assigned": "Tuvalu"
+  },
+  {
+    "name": "Anousha Vohra",
+    "email": "anoushavohra86@gmail.com",
+    "role": "Delegate",
+    "committee": "Unassigned",
     "model_country_assigned": "Unassigned"
   },
   {
-    "name": "Kritika Saini",
-    "email": "kritikasaini.mun@gmail.com",
+    "name": "Hala Nassar",
+    "email": "hodihi2225@gmail.com",
     "role": "Delegate",
     "committee": "International Court of Justice (ICJ)",
+    "model_country_assigned": "United States"
+  },
+  {
+    "name": "Pranit Poddar",
+    "email": "pranitpoddar2408@gmail.com",
+    "role": "Delegate",
+    "committee": "International Court of Justice (ICJ)",
+    "model_country_assigned": "United Kingdom"
+  },
+  {
+    "name": "Maarij Mahmood khan",
+    "email": "marimahmood27@gmail.com",
+    "role": "Delegate",
+    "committee": "International Court of Justice (ICJ)",
+    "model_country_assigned": "Maldives"
+  },
+  {
+    "name": "Rabnoor Singh",
+    "email": "nunu565690@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "Nigeria"
+  },
+  {
+    "name": "Fareeha Azhar",
+    "email": "fareehaazhar786@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "South Africa"
+  },
+  {
+    "name": "Defne Çubuk",
+    "email": "defnecubuk@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "China"
+  },
+  {
+    "name": "Dania Nasir",
+    "email": "danianasir151@gmail.com",
+    "role": "Delegate",
+    "committee": "International Court of Justice (ICJ)",
+    "model_country_assigned": "Russian Federation"
+  },
+  {
+    "name": "Giribha Bhatt",
+    "email": "giribhaab@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "Switzerland"
+  },
+  {
+    "name": "Adn Fatima",
+    "email": "adnfarooq315@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "United States"
+  },
+  {
+    "name": "Amay Singh Kanwar",
+    "email": "amaysinghkanwar@gmail.com",
+    "role": "Delegate",
+    "committee": "International Court of Justice (ICJ)",
+    "model_country_assigned": "Marshall Islands"
+  },
+  {
+    "name": "Abdul Rehman Tauqir Ahmad",
+    "email": "ar1599672@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "Singapore"
+  },
+  {
+    "name": "Vishakha Sharma",
+    "email": "vishakhash0000@gmail.com",
+    "role": "Delegate",
+    "committee": "Unassigned",
     "model_country_assigned": "Unassigned"
+  },
+  {
+    "name": "Fatima (only Fatima)",
+    "email": "fatimaahmedfaraz@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "Japan"
+  },
+  {
+    "name": "Ji Woo Kim",
+    "email": "jwookim111310@student.interamericano.edu.gt",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "South Korea"
+  },
+  {
+    "name": "Vanshika Verma",
+    "email": "vanshikaaverma.11@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "Türkiye"
+  },
+  {
+    "name": "Saoda Binte Zahid",
+    "email": "saodabintezahid@gmail.com",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "Germany"
+  },
+  {
+    "name": "Joud Chehab",
+    "email": "joudchehab@gokkusagi.k12.tr",
+    "role": "Delegate",
+    "committee": "World Health Organization (WHO)",
+    "model_country_assigned": "United Kingdom"
   },
   {
     "name": "Daniela Cañas García de Movellán",
@@ -718,36 +732,36 @@ export const OFFICIAL_DATASET: RawParticipant[] = [
     "model_country_assigned": "Unassigned"
   },
   {
-    "name": "Alisa Pchelnikova",
-    "email": "elisapchelnikova@gmail.com",
+    "name": "Polina Vasylenko",
+    "email": "vasilenkopolik@gmail.com",
     "role": "Observer",
     "committee": "Unassigned",
     "model_country_assigned": "Unassigned"
   },
   {
-    "name": "Ceren Aydemir",
-    "email": "cerenaydemir037@gmail.com",
+    "name": "Vidi Riyanto",
+    "email": "b.vanilla.d@gmail.com",
     "role": "Observer",
     "committee": "Unassigned",
     "model_country_assigned": "Unassigned"
   },
   {
-    "name": "Ela Gündoğan",
-    "email": "elagundogan09@gmail.com",
+    "name": "Vinutha .R",
+    "email": "goldenhourchronicle@gmail.com",
     "role": "Observer",
     "committee": "Unassigned",
     "model_country_assigned": "Unassigned"
   },
   {
-    "name": "Pelin Karataş",
-    "email": "karataspelin10@gmail.com",
+    "name": "Oumayma Aouaj",
+    "email": "o.aouaj-324@ump.ac.ma",
     "role": "Observer",
     "committee": "Unassigned",
     "model_country_assigned": "Unassigned"
   },
   {
-    "name": "Melis Yılmaz",
-    "email": "melisyilmaz.contact@gmail.com",
+    "name": "Abir Hamrani",
+    "email": "abirhamrani@gmail.com",
     "role": "Observer",
     "committee": "Unassigned",
     "model_country_assigned": "Unassigned"

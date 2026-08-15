@@ -139,9 +139,10 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
   }, []);
 
   // ── Role resolution ──────────────────────────────────────────────────────
+  const isObserver = profile.role === 'Observer';
   const isOrganiser = isOrganiserRole(profile.role);
-  const isChair = profile.role === 'Chair' || isOrganiser;
-  const isDelegate = profile.role === 'Delegate';
+  const isChair = (profile.role === 'Chair' || isOrganiser) && !isObserver;
+  const isDelegate = profile.role === 'Delegate' && !isObserver;
 
   // ── Committee Selection ──────────────────────────────────────────────────
   const [activeCommittee, setActiveCommittee] = useState<CommitteeName>(() => {
@@ -322,7 +323,7 @@ export const MUNHostingPage: React.FC<MUNHostingPageProps> = ({ profile }) => {
                 border: `1px solid ${dividerBorder}`,
               }}
             >
-              {profile.role} · {profile.country || 'Executive Secretariat'}
+              {profile.role} · {isObserver ? 'Read-Only Live Observer' : profile.country || 'Executive Secretariat'}
             </span>
             <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-500">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> Live Room
@@ -1511,17 +1512,19 @@ const MotionsSection: React.FC<MotionsSectionProps> = ({
           </span>
         </div>
 
-        <button
-          onClick={() => setOpenSubmit(!openSubmit)}
-          className="text-xs font-bold px-3 py-1.5 rounded-lg border flex items-center gap-1 transition shadow-sm"
-          style={{
-            background: dark ? '#27272a' : '#fef08a',
-            color: dark ? '#ffffff' : '#172554',
-            borderColor: dark ? '#3f3f46' : '#fde047',
-          }}
-        >
-          <Plus className="h-3.5 w-3.5" /> Submit Motion
-        </button>
+        {profile.role !== 'Observer' && (
+          <button
+            onClick={() => setOpenSubmit(!openSubmit)}
+            className="text-xs font-bold px-3 py-1.5 rounded-lg border flex items-center gap-1 transition shadow-sm"
+            style={{
+              background: dark ? '#27272a' : '#fef08a',
+              color: dark ? '#ffffff' : '#172554',
+              borderColor: dark ? '#3f3f46' : '#fde047',
+            }}
+          >
+            <Plus className="h-3.5 w-3.5" /> Submit Motion
+          </button>
+        )}
       </div>
 
       <div className="border-t" style={{ borderColor: dividerBorder }} />
