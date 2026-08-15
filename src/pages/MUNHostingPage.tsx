@@ -1047,46 +1047,59 @@ const GeneralSpeakersListSection: React.FC<GeneralSpeakersListSectionProps> = ({
 }) => {
   const [submittingHand, setSubmittingHand] = useState(false);
   const [manualCountry, setManualCountry] = useState('');
+  const [addingSpeaker, setAddingSpeaker] = useState(false);
+  const [gslError, setGslError] = useState<string | null>(null);
   const [yieldModalOpen, setYieldModalOpen] = useState(false);
   const [selectedYieldTarget, setSelectedYieldTarget] = useState('');
 
-  // Available countries in this committee
-  const committeeDelegates = ROSTER_MASTER_DATA.filter((r) => r.committee === committeeId);
+  // Rule 1 & Rule 3: Strictly filter candidate list to Delegates assigned to this committee (Chairs and Observers omitted)
+  const activeSpeakerNames = new Set(
+    speakers
+      .filter((s) => s.status !== 'completed')
+      .map((s) => s.name.toLowerCase().trim())
+  );
+  const activeSpeakerCountries = new Set(
+    speakers
+      .filter((s) => s.status !== 'completed')
+      .map((s) => s.country.toLowerCase().trim())
+  );
 
-  const handleAddMeToGSL = async () => {
-    setSubmittingHand(true);
-    try {
-      await addSpeakerToQueue(committeeId, {
-        uid: profile.uid,
-        name: profile.name || profile.displayName,
-        country: profile.country,
-      });
-    } catch (e) {
-      console.error(e);
-    }
-    setSubmittingHand(false);
-  };
-
-  const handleWithdrawFromGSL = async () => {
-    if (!userInQueue) return;
-    setSubmittingHand(true);
-    try {
-      await removeSpeakerFromQueue(userInQueue.id);
-    } catch (e) {
-      console.error(e);
-    }
-    setSubmittingHand(false);
-  };
+  const eligibleDelegates = ROSTER_MASTER_DATA.filter(
+    (r) =>
+      r.role === 'Delegate' &&
+      r.committee === committeeId &&
+      !activeSpeakerNames.has(r.name.toLowerCase().trim()) &&
+      (r.country === 'Unassigned' || !activeSpeakerCountries.has(r.country.toLowerCase().trim()))
+  );
 
   const handleAddCountryToQueue = async () => {
     if (!manualCountry) return;
-    const match = committeeDelegates.find((d) => d.country === manualCountry);
-    await addSpeakerToQueue(committeeId, {
-      uid: match ? `delegate_${match.id}` : `manual_${Date.now()}`,
-      name: match ? match.name : manualCountry,
-      country: manualCountry,
-    });
-    setManualCountry('');
+    setGslError(null);
+    setAddingSpeaker(true);
+    const match = eligibleDelegates.find((d) => d.country === manualCountry || d.name === manualCountry);
+    try {
+      await addSpeakerToQueue(
+        committeeId,
+        {
+          uid: match ? `delegate_${match.id}` : `manual_${Date.now()}`,
+          name: match ? match.name : manualCountry,
+          country: match ? match.country : manualCountry,
+          role: 'Delegate',
+          committee: committeeId,
+        },
+        {
+          uid: profile.uid,
+          role: profile.role,
+          committee: profile.committee,
+        }
+      );
+      setManualCountry('');
+    } catch (err: any) {
+      console.error('Failed to add speaker to GSL:', err);
+      setGslError(err?.message || 'Failed to add delegate to Speakers List.');
+    } finally {
+      setAddingSpeaker(false);
+    }
   };
 
   const handleNextSpeaker = async () => {
@@ -1234,10 +1247,10 @@ const GeneralSpeakersListSection: React.FC<GeneralSpeakersListSectionProps> = ({
             className="w-full px-2.5 py-1.5 rounded-lg text-xs font-bold"
             style={{ background: dark ? '#18181b' : '#faf8f5', border: `1px solid ${dividerBorder}`, color: headingColor }}
           >
-            <option value="">-- Choose Country --</option>
-            {committeeDelegates.map((d) => (
+            <option value="">-- Choose Delegate --</option>
+            {eligibleDelegates.map((d) => (
               <option key={d.id} value={`${d.country} (${d.name})`}>
-                {d.country} — {d.name}
+                {d.country !== 'Unassigned' ? `${d.country} — ${d.name}` : d.name}
               </option>
             ))}
           </select>
@@ -1262,77 +1275,85 @@ const GeneralSpeakersListSection: React.FC<GeneralSpeakersListSectionProps> = ({
 
       <div className="border-t" style={{ borderColor: dividerBorder }} />
 
-      {/* 3. Delegate Join/Leave GSL Controls */}
+      {/* 3. Read-Only Delegate GSL Position Indicator (Rule 2: Self-Addition Disallowed) */}
       {isDelegate && (
-        <div className="flex items-center justify-between py-1">
+        <div
+          className="p-3.5 rounded-xl border flex items-center justify-between"
+          style={{
+            background: dark ? '#18181b' : '#faf8f5',
+            borderColor: dividerBorder,
+          }}
+        >
           <div>
             <span className="text-xs font-bold block" style={{ color: headingColor }}>
-              {userInQueue ? 'You are on the Speakers List' : 'Join General Speakers List'}
+              {userInQueue ? 'You are on the General Speakers List' : 'General Speakers List Status'}
             </span>
             <span className="text-[11px] font-medium" style={{ color: mutedText }}>
               {userInQueue
-                ? `Current Position: #${waitingQueue.findIndex((s) => s.id === userInQueue.id) + 1}`
-                : 'Click below to be added to the queue'}
+                ? `Current Position: #${waitingQueue.findIndex((s) => s.id === userInQueue.id) + 1} in queue`
+                : 'Moderated exclusively by the Executive Board (Committee Chair).'}
             </span>
           </div>
 
-          {userInQueue ? (
-            <button
-              onClick={handleWithdrawFromGSL}
-              disabled={submittingHand}
-              className="text-xs px-3 py-1.5 rounded-lg font-bold border border-red-800 text-red-400 hover:bg-red-950 transition"
+          {userInQueue && (
+            <span
+              className="px-3 py-1 rounded-full text-xs font-mono font-black"
+              style={{
+                background: dark ? '#27272a' : '#fef08a',
+                color: dark ? '#ffffff' : '#172554',
+                border: `1px solid ${dividerBorder}`,
+              }}
             >
-              Withdraw from GSL
-            </button>
-          ) : (
+              Position #{waitingQueue.findIndex((s) => s.id === userInQueue.id) + 1}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* 4. Chair Add Delegate to GSL (Strict Role & Committee Filtered) */}
+      {isChair && (
+        <div className="space-y-2">
+          {gslError && (
+            <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-bold flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              <span>{gslError}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <select
+              value={manualCountry}
+              onChange={(e) => {
+                setManualCountry(e.target.value);
+                setGslError(null);
+              }}
+              className="flex-1 px-3 py-1.5 rounded-lg text-xs font-bold"
+              style={{
+                background: dark ? '#18181b' : '#faf8f5',
+                border: `1px solid ${dividerBorder}`,
+                color: headingColor,
+              }}
+            >
+              <option value="">-- Add Delegate to GSL --</option>
+              {eligibleDelegates.map((d) => (
+                <option key={d.id} value={d.country !== 'Unassigned' ? d.country : d.name}>
+                  {d.country !== 'Unassigned' ? `${d.country} (${d.name})` : d.name}
+                </option>
+              ))}
+            </select>
             <button
-              onClick={handleAddMeToGSL}
-              disabled={submittingHand}
-              className="text-xs px-3 py-1.5 rounded-lg font-bold transition shadow-sm"
+              onClick={handleAddCountryToQueue}
+              disabled={!manualCountry || addingSpeaker}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50 transition shadow-sm flex items-center gap-1.5"
               style={{
                 background: dark ? '#27272a' : '#fef08a',
                 color: dark ? '#ffffff' : '#172554',
                 border: dark ? '1px solid #3f3f46' : '1px solid #fde047',
               }}
             >
-              + Add Me to GSL
+              {addingSpeaker ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+              <span>Add Speaker</span>
             </button>
-          )}
-        </div>
-      )}
-
-      {/* 4. Chair Add Country to GSL */}
-      {isChair && (
-        <div className="flex items-center gap-2">
-          <select
-            value={manualCountry}
-            onChange={(e) => setManualCountry(e.target.value)}
-            className="flex-1 px-3 py-1.5 rounded-lg text-xs font-bold"
-            style={{
-              background: dark ? '#18181b' : '#faf8f5',
-              border: `1px solid ${dividerBorder}`,
-              color: headingColor,
-            }}
-          >
-            <option value="">-- Add Country to GSL --</option>
-            {committeeDelegates.map((d) => (
-              <option key={d.id} value={d.country}>
-                {d.country} ({d.name})
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handleAddCountryToQueue}
-            disabled={!manualCountry}
-            className="px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50 transition shadow-sm"
-            style={{
-              background: dark ? '#27272a' : '#fef08a',
-              color: dark ? '#ffffff' : '#172554',
-              border: dark ? '1px solid #3f3f46' : '1px solid #fde047',
-            }}
-          >
-            Add Speaker
-          </button>
+          </div>
         </div>
       )}
 

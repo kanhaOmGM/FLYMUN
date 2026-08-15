@@ -16,6 +16,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { SpeakerQueueItem, CommitteeTimerState, CommitteeMotion, RaisedHandItem } from '../types';
+import { isOrganiserRole } from '../types';
+import { ROSTER_MASTER_DATA } from '../data/rosterData';
 
 // ===========================================================================
 // 1. Real-Time Hand Raises (Task 3)
@@ -139,10 +141,81 @@ export function subscribeToSpeakerQueue(
 
 export async function addSpeakerToQueue(
   committeeId: string,
-  speaker: { uid?: string; name: string; country: string }
+  speaker: {
+    uid?: string;
+    name: string;
+    country: string;
+    role?: string;
+    committee?: string;
+  },
+  requester?: {
+    uid?: string;
+    role: string;
+    committee?: string;
+  }
 ): Promise<string> {
+  // 1. Requester RBAC: Only Chairs and Admins can add speakers to the GSL
+  if (requester && requester.role !== 'Chair' && !isOrganiserRole(requester.role as any)) {
+    throw new Error('403 Forbidden: Only committee chairs or administrators can add delegates to the Speakers List.');
+  }
+
+  // 2. Cross-Committee Chair Check
+  if (
+    requester &&
+    requester.role === 'Chair' &&
+    requester.committee &&
+    requester.committee !== 'Unassigned' &&
+    requester.committee !== committeeId
+  ) {
+    throw new Error(`403 Forbidden: You are authorized for ${requester.committee}, not ${committeeId}.`);
+  }
+
+  // 3. Match candidate against master roster
+  const candidateName = speaker.name.trim().toLowerCase();
+  const candidateCountry = speaker.country.trim().toLowerCase();
+
+  const rosterMatch = ROSTER_MASTER_DATA.find(
+    (r) =>
+      r.name.toLowerCase().trim() === candidateName ||
+      (r.country !== 'Unassigned' && r.country.toLowerCase().trim() === candidateCountry && r.committee === committeeId)
+  );
+
+  const candidateRole = speaker.role || rosterMatch?.role || 'Delegate';
+  const candidateCommittee = speaker.committee || rosterMatch?.committee || committeeId;
+
+  // Rule 1: Target candidate must be a Delegate (Chairs/Observers are blocked)
+  if (candidateRole !== 'Delegate') {
+    throw new Error('422 Unprocessable Entity: Only delegates can be added to the Speakers List.');
+  }
+
+  // Rule 3: Target candidate must be assigned to this specific committee
+  if (candidateCommittee !== committeeId && candidateCommittee !== 'Unassigned') {
+    throw new Error(`400 Bad Request: Cannot add delegate: ${speaker.name} is not assigned to this committee.`);
+  }
+
+  // Rule 3 Duplicate Check: Check if candidate/country is already active in queue
+  const q = query(
+    collection(db, 'committee_speakers'),
+    where('committee', '==', committeeId)
+  );
+  const snap = await getDocs(q);
+  const activeSpeakers = snap.docs.map((d) => d.data() as SpeakerQueueItem);
+  const alreadyInQueue = activeSpeakers.some(
+    (s) =>
+      s.status !== 'completed' &&
+      (
+        (speaker.uid && s.uid === speaker.uid) ||
+        (s.name.toLowerCase().trim() === candidateName && candidateName !== 'unassigned') ||
+        (candidateCountry !== 'unassigned' && s.country.toLowerCase().trim() === candidateCountry)
+      )
+  );
+
+  if (alreadyInQueue) {
+    throw new Error(`409 Conflict: Cannot add delegate: ${speaker.name || speaker.country} is already in the speakers list.`);
+  }
+
   const ref = await addDoc(collection(db, 'committee_speakers'), {
-    uid: speaker.uid || `manual_${Date.now()}`,
+    uid: speaker.uid || `delegate_${Date.now()}`,
     name: speaker.name,
     country: speaker.country,
     committee: committeeId,

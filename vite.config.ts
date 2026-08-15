@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
       {
         name: 'api-serverless-dev',
         configureServer(server) {
+          // Route: /api/send-invite
           server.middlewares.use('/api/send-invite', async (req, res) => {
             res.setHeader('Access-Control-Allow-Origin', '*');
             res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -73,6 +74,62 @@ export default defineConfig(({ mode }) => {
                     })
                   );
                 }
+              } catch (err: any) {
+                res.statusCode = 500;
+                res.end(JSON.stringify({ error: err?.message || 'Server error' }));
+              }
+            });
+          });
+
+          // Route: /api/gsl/add
+          server.middlewares.use('/api/gsl/add', async (req, res) => {
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+            if (req.method === 'OPTIONS') {
+              res.statusCode = 200;
+              res.end();
+              return;
+            }
+
+            if (req.method !== 'POST') {
+              res.statusCode = 405;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Method not allowed. Use POST.' }));
+              return;
+            }
+
+            let body = '';
+            req.on('data', (chunk) => {
+              body += chunk;
+            });
+
+            req.on('end', async () => {
+              res.setHeader('Content-Type', 'application/json');
+              try {
+                const parsed = body ? JSON.parse(body) : {};
+                const { candidate, requester } = parsed;
+
+                if (
+                  requester &&
+                  requester.role !== 'Chair' &&
+                  requester.role !== 'Event Organiser' &&
+                  requester.role !== 'Admin'
+                ) {
+                  res.statusCode = 403;
+                  res.end(JSON.stringify({ error: 'Forbidden: Only committee chairs or admins can modify the GSL queue.' }));
+                  return;
+                }
+
+                if (candidate && candidate.role && candidate.role !== 'Delegate') {
+                  res.statusCode = 422;
+                  res.end(JSON.stringify({ error: 'Only delegates can be added to the Speakers List.' }));
+                  return;
+                }
+
+                res.statusCode = 200;
+                res.end(JSON.stringify({ success: true, message: 'Candidate validated.' }));
               } catch (err: any) {
                 res.statusCode = 500;
                 res.end(JSON.stringify({ error: err?.message || 'Server error' }));
