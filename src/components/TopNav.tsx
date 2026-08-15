@@ -228,37 +228,41 @@ export const TopNav: React.FC<TopNavProps> = ({ activeTab, setActiveTab, profile
                 <Mail className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: dark ? '#ffffff' : '#172554' }} />
                 <div>
                   <h4 className="font-bold text-xs sm:text-sm" style={{ color: dark ? '#ffffff' : '#172554' }}>
-                    Official Secretariat Email
+                    Official Email
                   </h4>
                   <p className="text-xs font-mono mt-0.5" style={{ color: dark ? '#d4d4d8' : '#1e3a8a' }}>
-                    support@flymun.org
+                    futureleadersyouthemail@gmail.com
                   </p>
                   <p className="text-[11px] mt-1 font-medium" style={{ color: dark ? '#a1a1aa' : '#64748b' }}>
-                    For roster queries, credential verification, and general conference inquiries.
+                    For all queries about FLY.
                   </p>
                 </div>
               </div>
-
               <div className="p-4 rounded-2xl border flex items-start gap-3.5" style={{ background: dark ? '#000000' : '#faf8f5', borderColor: panelBorder }}>
-                <MessageSquare className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: dark ? '#ffffff' : '#172554' }} />
+                <Mail className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: dark ? '#ffffff' : '#172554' }} />
                 <div>
                   <h4 className="font-bold text-xs sm:text-sm" style={{ color: dark ? '#ffffff' : '#172554' }}>
-                    Live Delegate Helpdesk
+                    Organiser's email(Nefes)
                   </h4>
-                  <p className="text-xs mt-0.5 font-medium" style={{ color: dark ? '#d4d4d8' : '#334155' }}>
-                    Reach out to your Committee Chair or the Event Organiser via the Interactive MUN Workspace.
+                  <p className="text-xs font-mono mt-0.5" style={{ color: dark ? '#d4d4d8' : '#1e3a8a' }}>
+                    oykunefesoz@gmail.com
+                  </p>
+                  <p className="text-[11px] mt-1 font-medium" style={{ color: dark ? '#a1a1aa' : '#64748b' }}>
+                    For all queries about the conference.
                   </p>
                 </div>
               </div>
-
               <div className="p-4 rounded-2xl border flex items-start gap-3.5" style={{ background: dark ? '#000000' : '#faf8f5', borderColor: panelBorder }}>
-                <Sparkles className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: dark ? '#ffffff' : '#172554' }} />
+                <Mail className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: dark ? '#ffffff' : '#172554' }} />
                 <div>
                   <h4 className="font-bold text-xs sm:text-sm" style={{ color: dark ? '#ffffff' : '#172554' }}>
-                    Interactive MUN Platform Support
+                    Developer's email(Nefes)
                   </h4>
-                  <p className="text-[11px] font-medium" style={{ color: dark ? '#a1a1aa' : '#64748b' }}>
-                    Having trouble claiming your seat or accessing your account? Use the "Login with Link" tool on the sign-in page or contact the Event Organiser.
+                  <p className="text-xs font-mono mt-0.5" style={{ color: dark ? '#d4d4d8' : '#1e3a8a' }}>
+                    ssgdns@duck.com
+                  </p>
+                  <p className="text-[11px] mt-1 font-medium" style={{ color: dark ? '#a1a1aa' : '#64748b' }}>
+                    For all queries about the Website.
                   </p>
                 </div>
               </div>

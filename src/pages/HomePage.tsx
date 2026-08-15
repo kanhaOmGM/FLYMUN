@@ -251,7 +251,7 @@ const CommitteeSection: React.FC<{ committee: CommitteeConfig; dark: boolean; is
                 }}
               />
               <span style={{ color: dark ? '#ffffff' : '#172554', fontWeight: 600 }}>
-                Chair (Row 1 Dais — 20% Larger)
+                Chair (Row 1 Dais )
               </span>
             </div>
             <div className="flex items-center gap-2 font-mono text-[11px]">
@@ -557,9 +557,7 @@ export const HomePage: React.FC<HomePageProps> = ({ profile }) => {
           >
             Official Conference Honors
           </h2>
-          <p className="text-xs sm:text-sm font-normal" style={{ color: mutedText }}>
-            Scroll horizontally to review the criteria for distinctions and commendations.
-          </p>
+
         </div>
 
         {/* Horizontal Scrollable Container */}
