@@ -441,7 +441,7 @@ export const LoginPage: React.FC = () => {
 
           <p
             className="text-center text-xs sm:text-sm mt-6 font-medium"
-            style={{ color: dark ? '#94a3b8' : '#64748b' }}
+            style={{ color: dark ? '#a1a1aa' : '#64748b' }}
           >
             {isRegister ? 'Already have an account?' : "Don't have an account yet?"}{' '}
             <button
@@ -450,7 +450,7 @@ export const LoginPage: React.FC = () => {
                 clearError();
                 setIsRegister(!isRegister);
               }}
-              className="font-extrabold transition hover:underline ml-1"
+              className="font-extrabold transition hover:underline ml-1 cursor-pointer"
               style={{ color: dark ? '#ffffff' : '#172554' }}
             >
               {isRegister ? 'Sign in here' : 'Register here'}
@@ -458,14 +458,6 @@ export const LoginPage: React.FC = () => {
           </p>
 
           {/* Admin / Organiser Access Note */}
-          <div
-            className="mt-5 p-3 rounded-2xl border text-center transition-colors"
-            style={{
-              background: dark ? '#18181b' : '#faf8f5',
-              borderColor: rightBorder,
-            }}
-          >
-          </div>
         </div>
       </div>
 
