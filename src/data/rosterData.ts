@@ -482,9 +482,9 @@ export const OFFICIAL_DATASET: RawParticipant[] = [
   {
     "name": "Nynieshia Alex",
     "email": "nynieshiaalex@gmail.com",
-    "role": "Delegate",
+    "role": "Chair",
     "committee": "International Press Corps (IPC)",
-    "model_country_assigned": "France 24"
+    "model_country_assigned": "Unassigned"
   },
   {
     "name": "Ayesha Salman",
