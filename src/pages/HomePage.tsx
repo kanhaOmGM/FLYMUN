@@ -240,33 +240,7 @@ const CommitteeSection: React.FC<{ committee: CommitteeConfig; dark: boolean; is
             ))}
           </div>
 
-          {/* Clean Legend (No Observers, No Faculty Advisors) */}
-          <div className="mt-8 flex flex-wrap justify-center gap-6 pt-4 border-t" style={{ borderColor: dividerColor }}>
-            <div className="flex items-center gap-2 font-mono text-[11px]">
-              <span
-                className="w-3.5 h-3.5 rounded-full ring-2"
-                style={{
-                  background: dark ? '#27272a' : '#fef08a',
-                  borderColor: dark ? '#ffffff' : '#eab308',
-                }}
-              />
-              <span style={{ color: dark ? '#ffffff' : '#172554', fontWeight: 600 }}>
-                Chair (Row 1 Dais )
-              </span>
-            </div>
-            <div className="flex items-center gap-2 font-mono text-[11px]">
-              <span
-                className="w-2.5 h-2.5 rounded-full ring-1"
-                style={{
-                  background: dark ? '#000000' : '#172554',
-                  borderColor: dark ? '#71717a' : '#fde047',
-                }}
-              />
-              <span style={{ color: dark ? '#d4d4d8' : '#475569' }}>
-                Delegate (General Committee Rows)
-              </span>
-            </div>
-          </div>
+
         </div>
       )}
     </div>

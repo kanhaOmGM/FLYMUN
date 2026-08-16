@@ -152,10 +152,10 @@ export const LoginPage: React.FC = () => {
     setTimeout(() => emailInputRef.current?.focus(), 150);
   };
 
-  // Instagram-style two sections: Left Black Background, Right Grey Background
-  const rightBg = dark ? '#0f172a' : '#f1f5f9';
-  const rightBorder = dark ? '#334155' : '#cbd5e1';
-  const rightCardBg = dark ? '#0a1128' : '#ffffff';
+  // Instagram-style two sections: Left Black Background, Right Dark Gray Background
+  const rightBg = dark ? '#121214' : '#f1f5f9';
+  const rightBorder = dark ? '#2d2d32' : '#cbd5e1';
+  const rightCardBg = dark ? '#1c1c20' : '#ffffff';
 
   return (
     <div className="min-h-screen w-full grid grid-cols-1 lg:grid-cols-12 overflow-x-hidden">
@@ -170,7 +170,7 @@ export const LoginPage: React.FC = () => {
           <span
             className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium uppercase tracking-wider shadow-sm bg-zinc-900 border border-zinc-700 text-zinc-300"
           >
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            {/* <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> */}
             OFFICIAL CONFERENCE PORTAL
           </span>
 
@@ -185,7 +185,7 @@ export const LoginPage: React.FC = () => {
         {/* Viewport-Filling Hero Section */}
         <div className="my-auto py-6 sm:py-10 space-y-4">
           <h1 className="font-serif text-6xl sm:text-8xl md:text-9xl lg:text-[9.5rem] xl:text-[11.5rem] font-normal tracking-tighter leading-[0.82] text-white select-none">
-            FL.Y <span className="italic font-normal">MUN</span>
+            FL.Y MUN
           </h1>
 
           <p className="font-serif italic text-xl sm:text-2xl md:text-3xl lg:text-4xl text-zinc-200 font-medium leading-snug tracking-tight max-w-2xl">
