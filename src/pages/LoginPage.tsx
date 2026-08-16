@@ -16,13 +16,9 @@ import {
   X,
   Loader2,
   Globe2,
-  Link2,
-  Copy,
-  Check,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { isEmailBanned } from '../services/userService';
 
 export const LoginPage: React.FC = () => {
   const { signIn, signUp, signInWithGoogle, error, clearError } = useAuth();
@@ -35,18 +31,10 @@ export const LoginPage: React.FC = () => {
   const [displayName, setDisplayName] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Login with Link modal state (replaces Reset Password)
-  const [showLoginLinkModal, setShowLoginLinkModal] = useState(false);
-  const [linkEmail, setLinkEmail] = useState('');
-  const [linkLoading, setLinkLoading] = useState(false);
-  const [generatedLoginLink, setGeneratedLoginLink] = useState<string | null>(null);
-  const [linkCopied, setLinkCopied] = useState(false);
-  const [linkError, setLinkError] = useState<string | null>(null);
-
   const authFormRef = useRef<HTMLDivElement | null>(null);
   const emailInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Check URL query parameters for pre-filling email (from direct login link)
+  // Check URL query parameters for pre-filling email
   useEffect(() => {
     const hash = window.location.hash || '';
     const qIndex = hash.indexOf('?');
@@ -104,52 +92,6 @@ export const LoginPage: React.FC = () => {
     setSubmitting(true);
     await signInWithGoogle();
     setSubmitting(false);
-  };
-
-  const handleGenerateLoginLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!linkEmail.trim()) return;
-
-    setLinkLoading(true);
-    setLinkError(null);
-    setGeneratedLoginLink(null);
-    setLinkCopied(false);
-
-    try {
-      const clean = linkEmail.trim().toLowerCase();
-      const banned = await isEmailBanned(clean);
-      if (banned) {
-        setLinkError(`Your account (${clean}) has been permanently banned from FLYIMUN 2026.`);
-        setLinkLoading(false);
-        return;
-      }
-
-      const directUrl = `${window.location.origin}/#/login?email=${encodeURIComponent(clean)}`;
-      setGeneratedLoginLink(directUrl);
-    } catch (err: any) {
-      setLinkError(err?.message || 'Failed to generate login link.');
-    } finally {
-      setLinkLoading(false);
-    }
-  };
-
-  const handleCopyGeneratedLink = async () => {
-    if (!generatedLoginLink) return;
-    try {
-      await navigator.clipboard.writeText(generatedLoginLink);
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2500);
-    } catch {
-      // Fallback
-    }
-  };
-
-  const handleApplyLinkEmail = () => {
-    if (linkEmail) {
-      setEmail(linkEmail.trim().toLowerCase());
-    }
-    setShowLoginLinkModal(false);
-    setTimeout(() => emailInputRef.current?.focus(), 150);
   };
 
   // Instagram-style two sections: Left Black Background, Right Dark Gray Background
@@ -251,7 +193,7 @@ export const LoginPage: React.FC = () => {
           <div className="mb-6">
             <h2
               className="font-serif text-3xl sm:text-4xl font-normal mb-1.5 tracking-tight"
-              style={{ color: dark ? '#ffffff' : '#172554' }}
+              style={{ color: dark ? '#ffffff' : '#475569' }}
             >
               {isRegister ? 'Register Account' : 'Sign In'}
             </h2>
@@ -451,7 +393,7 @@ export const LoginPage: React.FC = () => {
                 setIsRegister(!isRegister);
               }}
               className="font-extrabold transition hover:underline ml-1 cursor-pointer"
-              style={{ color: dark ? '#ffffff' : '#172554' }}
+              style={{ color: dark ? '#ffffff' : '#475569' }}
             >
               {isRegister ? 'Sign in here' : 'Register here'}
             </button>
@@ -460,163 +402,6 @@ export const LoginPage: React.FC = () => {
           {/* Admin / Organiser Access Note */}
         </div>
       </div>
-
-      {/* ── Login with Link / Instant Access Modal (Commented out) ────────────────────────── */}
-      {/* {showLoginLinkModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)' }}
-        >
-          <div
-            className="w-full max-w-md rounded-3xl border p-6 sm:p-8 shadow-2xl transition-colors duration-300 space-y-4"
-            style={{
-              background: rightCardBg,
-              borderColor: rightBorder,
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Link2 className="h-6 w-6 text-emerald-400" />
-                <h3 className="text-xl font-extrabold" style={{ color: dark ? '#ffffff' : '#172554' }}>
-                  Login with this Link
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowLoginLinkModal(false)}
-                className="p-1 rounded-lg hover:opacity-75 transition"
-                style={{ color: dark ? '#94a3b8' : '#475569' }}
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <p className="text-xs sm:text-sm font-medium" style={{ color: dark ? '#94a3b8' : '#64748b' }}>
-              Enter your registered email address below to generate your direct login link. No password or email verification is required.
-            </p>
-
-            {linkError && (
-              <div
-                className="p-3.5 rounded-xl text-xs font-bold flex items-start gap-2"
-                style={{
-                  background: dark ? '#18181b' : '#fef2f2',
-                  color: dark ? '#ffffff' : '#dc2626',
-                  border: `1px solid ${dark ? '#3f3f46' : '#fecaca'}`,
-                }}
-              >
-                <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
-                <span>{linkError}</span>
-              </div>
-            )}
-
-            {generatedLoginLink && (
-              <div
-                className="p-4 rounded-2xl border space-y-3 shadow-sm animate-in fade-in zoom-in-95"
-                style={{
-                  background: dark ? '#18181b' : '#faf8f5',
-                  borderColor: dark ? '#3f3f46' : '#cbd5e1',
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold font-mono text-emerald-400 uppercase tracking-wider">
-                    ✓ Direct Login Link Ready:
-                  </span>
-                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-800">
-                    Active
-                  </span>
-                </div>
-
-                <input
-                  type="text"
-                  readOnly
-                  value={generatedLoginLink}
-                  className="w-full px-3 py-2 rounded-xl font-mono text-xs border bg-black/40 text-slate-200 select-all focus:outline-none"
-                  style={{ borderColor: dark ? '#3f3f46' : '#cbd5e1' }}
-                />
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleCopyGeneratedLink}
-                    className="flex-1 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition shadow-sm"
-                    style={{
-                      background: linkCopied ? '#10b981' : (dark ? '#27272a' : '#fef08a'),
-                      color: linkCopied ? '#ffffff' : (dark ? '#ffffff' : '#172554'),
-                      border: linkCopied ? '1px solid #059669' : (dark ? '1px solid #3f3f46' : '1px solid #fde047'),
-                    }}
-                  >
-                    {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    <span>{linkCopied ? 'Copied ✓' : 'Copy Login Link'}</span>
-                  </button>
-
-                  <button
-                    onClick={handleApplyLinkEmail}
-                    className="flex-1 py-2.5 rounded-xl font-bold text-xs border flex items-center justify-center gap-1.5 transition"
-                    style={{
-                      background: dark ? '#000000' : '#ffffff',
-                      borderColor: dark ? '#3f3f46' : '#cbd5e1',
-                      color: dark ? '#ffffff' : '#172554',
-                    }}
-                  >
-                    <Rocket className="h-3.5 w-3.5" />
-                    <span>Use &amp; Sign In</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleGenerateLoginLink} className="space-y-4">
-              <div>
-                <label
-                  className="block text-xs font-bold mb-1.5"
-                  style={{ color: dark ? '#cbd5e1' : '#172554' }}
-                >
-                  Registered Email Address
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={linkEmail}
-                  onChange={(e) => setLinkEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="w-full px-4 py-2.5 rounded-xl text-sm transition focus:outline-none focus:ring-2 focus:ring-slate-400 font-medium"
-                  style={{
-                    background: dark ? '#000000' : '#faf8f5',
-                    border: `1px solid ${dark ? '#475569' : '#cbd5e1'}`,
-                    color: dark ? '#ffffff' : '#172554',
-                  }}
-                />
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowLoginLinkModal(false)}
-                  className="flex-1 py-2.5 rounded-xl font-bold text-xs sm:text-sm border transition"
-                  style={{
-                    background: dark ? '#000000' : '#faf8f5',
-                    borderColor: rightBorder,
-                    color: dark ? '#94a3b8' : '#475569',
-                  }}
-                >
-                  Close
-                </button>
-                <button
-                  type="submit"
-                  disabled={linkLoading || !linkEmail.trim()}
-                  className="flex-1 py-2.5 rounded-xl font-extrabold text-xs sm:text-sm shadow-sm transition flex items-center justify-center gap-2"
-                  style={{
-                    background: dark ? '#172554' : '#fef08a',
-                    color: dark ? '#ffffff' : '#172554',
-                    border: dark ? '1px solid #475569' : '1px solid #fde047',
-                  }}
-                >
-                  {linkLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Generate Login Link'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )} */}
-
     </div>
   );
 };
