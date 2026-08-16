@@ -334,8 +334,8 @@ export const LoginPage: React.FC = () => {
               disabled={submitting}
               className="w-full py-3 rounded-xl font-extrabold text-sm transition disabled:opacity-50 shadow-sm flex items-center justify-center gap-2 mt-2"
               style={{
-                background: dark ? '#172554' : '#fef08a',
-                color: dark ? '#ffffff' : '#172554',
+                background: dark ? '#475569' : '#fef08a',
+                color: dark ? '#ffffff' : '#475569',
                 border: dark ? '1px solid #475569' : '1px solid #fde047',
               }}
             >
